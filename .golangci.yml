@@ -1,0 +1,11 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*net/http.Response).Body.Close
+        - (io.ReadCloser).Close
+        - (*encoding/json.Encoder).Encode
+        - (*encoding/json.Decoder).Decode
+        - io.Copy
