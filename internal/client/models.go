@@ -83,6 +83,14 @@ type UpdateApplicationRequest struct {
 	DockerImage                *string           `json:"docker_image,omitempty"`
 }
 
+type TriggerDeploymentRequest struct {
+	IsRestart bool `json:"is_restart"`
+}
+
+type TriggerDeploymentResponse struct {
+	ID string `json:"id"`
+}
+
 type ApplicationListItem struct {
 	ID          string  `json:"id"`
 	Name        string  `json:"name"`

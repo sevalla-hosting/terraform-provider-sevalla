@@ -113,6 +113,35 @@ func (c *SevallaClient) DeleteApplication(ctx context.Context, id string) error 
 	return nil
 }
 
+func (c *SevallaClient) TriggerDeployment(ctx context.Context, appID string, input *TriggerDeploymentRequest) (string, error) {
+	body, err := json.Marshal(input)
+	if err != nil {
+		return "", fmt.Errorf("marshaling trigger deployment request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/applications/%s/deployments", appID), bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return "", parseErrorResponse(resp)
+	}
+
+	var deployment TriggerDeploymentResponse
+	if err := json.NewDecoder(resp.Body).Decode(&deployment); err != nil {
+		return "", fmt.Errorf("decoding deployment response: %w", err)
+	}
+
+	return deployment.ID, nil
+}
+
 func (c *SevallaClient) SuspendApplication(ctx context.Context, id string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/applications/%s/suspend", id), nil)
 	if err != nil {

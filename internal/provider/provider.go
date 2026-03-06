@@ -110,6 +110,7 @@ func (p *SevallaProvider) Resources(_ context.Context) []func() resource.Resourc
 		application.NewPrivatePortResource,
 		application.NewIPRestrictionResource,
 		application.NewDeploymentHookResource,
+		application.NewDeploymentResource,
 
 		// Database
 		database.NewResource,
