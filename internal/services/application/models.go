@@ -102,7 +102,11 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 	if app.DockerRegistryCredentialID != nil {
 		model.DockerRegistryCredentialID = types.StringValue(*app.DockerRegistryCredentialID)
 	}
-	model.BuildPath = optionalString(app.BuildPath)
+	if app.BuildPath != nil {
+		model.BuildPath = types.StringValue(*app.BuildPath)
+	} else {
+		model.BuildPath = types.StringValue(".")
+	}
 	model.PackBuilder = optionalString(app.PackBuilder)
 	model.NixpacksVersion = optionalString(app.NixpacksVersion)
 	model.DockerfilePath = optionalString(app.DockerfilePath)
