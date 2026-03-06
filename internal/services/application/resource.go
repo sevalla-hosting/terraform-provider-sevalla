@@ -312,7 +312,31 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	// Flatten the API response into the model.
+	appID := app.ID
+
+	// The create endpoint only accepts a limited set of fields. Apply any
+	// additional plan values (e.g. auto_deploy, build_type) via an update.
+	if updateReq := buildPostCreateUpdateRequest(ctx, &plan); updateReq != nil {
+		_, err = r.client.UpdateApplication(ctx, appID, updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Application After Create",
+				"Application was created but failed to apply additional settings: "+err.Error(),
+			)
+			return
+		}
+	}
+
+	// Read-after-write to ensure the state reflects the complete application.
+	app, err = r.client.GetApplication(ctx, appID)
+	if err != nil {
+		resp.Diagnostics.AddError(
+			"Error Reading Application",
+			"Could not read application ID "+appID+": "+err.Error(),
+		)
+		return
+	}
+
 	resp.Diagnostics.Append(flattenApplication(ctx, app, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return

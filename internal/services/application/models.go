@@ -285,6 +285,95 @@ func buildUpdateRequest(ctx context.Context, plan *ApplicationResourceModel, sta
 	return req
 }
 
+// buildPostCreateUpdateRequest constructs an UpdateApplicationRequest for fields that the
+// create endpoint does not accept. Returns nil if no update-only fields are set in the plan.
+func buildPostCreateUpdateRequest(ctx context.Context, plan *ApplicationResourceModel) *client.UpdateApplicationRequest {
+	req := &client.UpdateApplicationRequest{}
+	hasFields := false
+
+	if !plan.AutoDeploy.IsNull() && !plan.AutoDeploy.IsUnknown() {
+		v := plan.AutoDeploy.ValueBool()
+		req.AutoDeploy = &v
+		hasFields = true
+	}
+	if !plan.BuildType.IsNull() && !plan.BuildType.IsUnknown() {
+		v := plan.BuildType.ValueString()
+		req.BuildType = &v
+		hasFields = true
+	}
+	if !plan.BuildPath.IsNull() && !plan.BuildPath.IsUnknown() {
+		v := plan.BuildPath.ValueString()
+		req.BuildPath = &v
+		hasFields = true
+	}
+	if !plan.BuildCacheEnabled.IsNull() && !plan.BuildCacheEnabled.IsUnknown() {
+		v := plan.BuildCacheEnabled.ValueBool()
+		req.BuildCacheEnabled = &v
+		hasFields = true
+	}
+	if !plan.HibernationEnabled.IsNull() && !plan.HibernationEnabled.IsUnknown() {
+		v := plan.HibernationEnabled.ValueBool()
+		req.HibernationEnabled = &v
+		hasFields = true
+	}
+	if !plan.HibernateAfterSeconds.IsNull() && !plan.HibernateAfterSeconds.IsUnknown() {
+		v := plan.HibernateAfterSeconds.ValueInt64()
+		req.HibernateAfterSeconds = &v
+		hasFields = true
+	}
+	if !plan.DockerfilePath.IsNull() && !plan.DockerfilePath.IsUnknown() {
+		v := plan.DockerfilePath.ValueString()
+		req.DockerfilePath = &v
+		hasFields = true
+	}
+	if !plan.DockerContext.IsNull() && !plan.DockerContext.IsUnknown() {
+		v := plan.DockerContext.ValueString()
+		req.DockerContext = &v
+		hasFields = true
+	}
+	if !plan.PackBuilder.IsNull() && !plan.PackBuilder.IsUnknown() {
+		v := plan.PackBuilder.ValueString()
+		req.PackBuilder = &v
+		hasFields = true
+	}
+	if !plan.NixpacksVersion.IsNull() && !plan.NixpacksVersion.IsUnknown() {
+		v := plan.NixpacksVersion.ValueString()
+		req.NixpacksVersion = &v
+		hasFields = true
+	}
+	if !plan.AllowDeployPaths.IsNull() && !plan.AllowDeployPaths.IsUnknown() {
+		var paths []string
+		plan.AllowDeployPaths.ElementsAs(ctx, &paths, false)
+		req.AllowDeployPaths = paths
+		hasFields = true
+	}
+	if !plan.IgnoreDeployPaths.IsNull() && !plan.IgnoreDeployPaths.IsUnknown() {
+		var paths []string
+		plan.IgnoreDeployPaths.ElementsAs(ctx, &paths, false)
+		req.IgnoreDeployPaths = paths
+		hasFields = true
+	}
+	if !plan.Buildpacks.IsNull() && !plan.Buildpacks.IsUnknown() {
+		var bpObjects []types.Object
+		plan.Buildpacks.ElementsAs(ctx, &bpObjects, false)
+		buildpacks := make([]client.BuildpackConfig, 0, len(bpObjects))
+		for _, obj := range bpObjects {
+			attrs := obj.Attributes()
+			buildpacks = append(buildpacks, client.BuildpackConfig{
+				Order:  int(attrs["order"].(types.Int64).ValueInt64()),
+				Source: attrs["source"].(types.String).ValueString(),
+			})
+		}
+		req.Buildpacks = buildpacks
+		hasFields = true
+	}
+
+	if !hasFields {
+		return nil
+	}
+	return req
+}
+
 // optionalString converts a *string to a types.String, returning null for nil pointers.
 func optionalString(s *string) types.String {
 	if s == nil {
