@@ -1,0 +1,27 @@
+---
+page_title: "Sevalla Provider"
+subcategory: ""
+description: |-
+  The Sevalla provider enables Terraform to manage Sevalla cloud infrastructure resources.
+---
+
+# Sevalla Provider
+
+The Sevalla provider enables Terraform to manage [Sevalla](https://sevalla.com) cloud infrastructure resources including applications, databases, static sites, load balancers, object storage, pipelines, and more.
+
+## Authentication
+
+The provider requires an API key for authentication. You can obtain an API key from the [Sevalla dashboard](https://app.sevalla.com).
+
+The API key can be provided in two ways:
+
+1. **Environment variable** (recommended): Set the `SEVALLA_API_KEY` environment variable.
+2. **Provider configuration**: Set the `api_key` attribute in the provider block.
+
+~> **Note:** Hard-coding credentials in Terraform configuration is not recommended. Use environment variables or a secrets management tool.
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+{{ .SchemaMarkdown | trimspace }}

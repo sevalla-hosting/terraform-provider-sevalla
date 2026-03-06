@@ -1,0 +1,78 @@
+name: API Compatibility Check
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  check:
+    name: Check API Compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fetch live OpenAPI spec
+        run: curl -sSf https://api.sevalla.com/v3/openapi.json -o openapi-live.json
+
+      - name: Compare specs
+        id: diff
+        run: |
+          if diff -q openapi.json openapi-live.json > /dev/null 2>&1; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run compatibility checker
+        if: steps.diff.outputs.changed == 'true'
+        id: compat
+        run: |
+          result=$(go run ./internal/tools/apicompat/ 2>&1) || true
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$result" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          if echo "$result" | grep -q "BREAKING"; then
+            echo "breaking=true" >> $GITHUB_OUTPUT
+          else
+            echo "breaking=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Open issue for breaking changes
+        if: steps.diff.outputs.changed == 'true' && steps.compat.outputs.breaking == 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'API Breaking Change Detected',
+              body: `The weekly API compatibility check detected breaking changes.\n\n\`\`\`\n${process.env.RESULT}\n\`\`\``,
+              labels: ['api-compat', 'breaking-change']
+            });
+        env:
+          RESULT: ${{ steps.compat.outputs.result }}
+
+      - name: Update spec and open PR for non-breaking changes
+        if: steps.diff.outputs.changed == 'true' && steps.compat.outputs.breaking == 'false'
+        run: |
+          cp openapi-live.json openapi.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          branch="api-compat/update-$(date +%Y%m%d)"
+          git checkout -b "$branch"
+          git add openapi.json
+          git commit -m "chore: update OpenAPI spec snapshot"
+          git push origin "$branch"
+          gh pr create --title "chore: Update OpenAPI spec snapshot" --body "Automated update from weekly API compatibility check." --base main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,45 @@
+name: Acceptance Tests
+
+on:
+  schedule:
+    - cron: "0 6 * * 1-5" # Weekdays at 6am UTC
+  workflow_dispatch: # Manual trigger
+
+permissions:
+  contents: read
+
+concurrency:
+  group: acceptance-tests
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Acceptance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TF_ACC: "1"
+      SEVALLA_API_KEY: ${{ secrets.SEVALLA_ACC_TEST_API_KEY }}
+      SEVALLA_API_URL: ${{ secrets.SEVALLA_ACC_TEST_API_URL }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run acceptance tests
+        run: go test ./internal/... -v -count=1 -timeout 20m -run 'TestAcc'
+
+      - name: Cleanup check
+        if: always()
+        run: |
+          echo "Checking for leftover test resources..."
+          for endpoint in applications databases static-sites webhooks docker-registries projects pipelines; do
+            count=$(curl -sf -H "Authorization: Bearer $SEVALLA_API_KEY" \
+              "${SEVALLA_API_URL}/${endpoint}?limit=1" | jq '.total // 0')
+            echo "$endpoint: $count"
+            if [ "$count" -gt "0" ]; then
+              echo "::warning::$count leftover $endpoint found — may need manual cleanup"
+            fi
+          done
