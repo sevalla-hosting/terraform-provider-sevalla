@@ -23,7 +23,7 @@ terraform {
   required_providers {
     sevalla = {
       source  = "sevalla-hosting/sevalla"
-      version = "~> 0.1"
+      version = "~> 1.0"
     }
   }
 }
