@@ -149,7 +149,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:    true,
 				Default:     stringdefault.StaticString("Dockerfile"),
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					nullUnlessBuildType("dockerfile"),
 				},
 			},
 			"docker_context": schema.StringAttribute{
@@ -158,7 +158,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Computed:    true,
 				Default:     stringdefault.StaticString("."),
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					nullUnlessBuildType("dockerfile"),
 				},
 			},
 			"pack_builder": schema.StringAttribute{
@@ -166,7 +166,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					nullUnlessBuildType("pack"),
 				},
 			},
 			"nixpacks_version": schema.StringAttribute{
@@ -174,7 +174,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+					nullUnlessBuildType("nixpacks"),
 				},
 			},
 			"allow_deploy_paths": schema.ListAttribute{
@@ -427,4 +427,50 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 
 func (r *applicationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+}
+
+// nullUnlessBuildTypeModifier is a plan modifier that sets a string attribute
+// to null when build_type does not match the required type. This mirrors the
+// API behaviour where build-type-specific fields (e.g. nixpacks_version,
+// dockerfile_path) are cleared when switching to a different build type.
+type nullUnlessBuildTypeModifier struct {
+	requiredBuildType string
+}
+
+func nullUnlessBuildType(bt string) planmodifier.String {
+	return nullUnlessBuildTypeModifier{requiredBuildType: bt}
+}
+
+func (m nullUnlessBuildTypeModifier) Description(_ context.Context) string {
+	return fmt.Sprintf("Set to null when build_type is not %q", m.requiredBuildType)
+}
+
+func (m nullUnlessBuildTypeModifier) MarkdownDescription(ctx context.Context) string {
+	return m.Description(ctx)
+}
+
+func (m nullUnlessBuildTypeModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	var buildType types.String
+	diags := req.Plan.GetAttribute(ctx, path.Root("build_type"), &buildType)
+	resp.Diagnostics.Append(diags...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// If build_type is unknown, mark this field unknown too.
+	if buildType.IsUnknown() {
+		resp.PlanValue = types.StringUnknown()
+		return
+	}
+
+	// If build_type doesn't match, the API will null this field out.
+	if buildType.ValueString() != m.requiredBuildType {
+		resp.PlanValue = types.StringNull()
+		return
+	}
+
+	// Build type matches — carry state forward for computed values.
+	if resp.PlanValue.IsUnknown() {
+		resp.PlanValue = req.StateValue
+	}
 }
