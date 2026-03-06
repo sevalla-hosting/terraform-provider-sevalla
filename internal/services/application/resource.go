@@ -11,6 +11,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
@@ -104,6 +105,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The build type. Valid values: dockerfile, pack, nixpacks.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString("dockerfile"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -112,6 +114,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The build path within the repository.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString("."),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -144,6 +147,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The path to the Dockerfile.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString("Dockerfile"),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -152,6 +156,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "The Docker build context path.",
 				Optional:    true,
 				Computed:    true,
+				Default:     stringdefault.StaticString("."),
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
