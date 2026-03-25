@@ -28,9 +28,11 @@ type StaticSite struct {
 	RootDirectory      *string `json:"root_directory"`
 	NodeVersion        *string `json:"node_version"`
 	IndexFile          *string `json:"index_file"`
-	ErrorFile          *string `json:"error_file"`
-	CreatedAt          string  `json:"created_at"`
-	UpdatedAt          string  `json:"updated_at"`
+	ErrorFile          *string  `json:"error_file"`
+	AllowDeployPaths   []string `json:"allow_deploy_paths"`
+	IgnoreDeployPaths  []string `json:"ignore_deploy_paths"`
+	CreatedAt          string   `json:"created_at"`
+	UpdatedAt          string   `json:"updated_at"`
 }
 
 type CreateStaticSiteRequest struct {
@@ -48,7 +50,9 @@ type CreateStaticSiteRequest struct {
 	NodeVersion        *string `json:"node_version,omitempty"`
 	IndexFile          *string `json:"index_file,omitempty"`
 	ErrorFile          *string `json:"error_file,omitempty"`
-	ProjectID          *string `json:"project_id,omitempty"`
+	AllowDeployPaths   []string `json:"allow_deploy_paths,omitempty"`
+	IgnoreDeployPaths  []string `json:"ignore_deploy_paths,omitempty"`
+	ProjectID          *string  `json:"project_id,omitempty"`
 }
 
 type UpdateStaticSiteRequest struct {
@@ -65,7 +69,9 @@ type UpdateStaticSiteRequest struct {
 	InstallCommand     *string `json:"install_command,omitempty"`
 	RootDirectory      *string `json:"root_directory,omitempty"`
 	IndexFile          *string `json:"index_file,omitempty"`
-	ErrorFile          *string `json:"error_file,omitempty"`
+	ErrorFile          *string  `json:"error_file,omitempty"`
+	AllowDeployPaths   []string `json:"allow_deploy_paths,omitempty"`
+	IgnoreDeployPaths  []string `json:"ignore_deploy_paths,omitempty"`
 }
 
 type StaticSiteListItem struct {

@@ -26,6 +26,8 @@ type StaticSiteResourceModel struct {
 	NodeVersion        types.String `tfsdk:"node_version"`
 	IndexFile          types.String `tfsdk:"index_file"`
 	ErrorFile          types.String `tfsdk:"error_file"`
+	AllowDeployPaths   types.List   `tfsdk:"allow_deploy_paths"`
+	IgnoreDeployPaths  types.List   `tfsdk:"ignore_deploy_paths"`
 	Name               types.String `tfsdk:"name"`
 	Status             types.String `tfsdk:"status"`
 	Hostname           types.String `tfsdk:"hostname"`
@@ -51,7 +53,7 @@ type StaticSiteListDataSourceModel struct {
 }
 
 // flattenStaticSite maps a client.StaticSite to the Terraform resource model.
-func flattenStaticSite(_ context.Context, ss *client.StaticSite, model *StaticSiteResourceModel) diag.Diagnostics {
+func flattenStaticSite(ctx context.Context, ss *client.StaticSite, model *StaticSiteResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	model.ID = types.StringValue(ss.ID)
@@ -79,11 +81,20 @@ func flattenStaticSite(_ context.Context, ss *client.StaticSite, model *StaticSi
 	model.IndexFile = optionalString(ss.IndexFile)
 	model.ErrorFile = optionalString(ss.ErrorFile)
 
+	// List fields
+	allowPaths, d := types.ListValueFrom(ctx, types.StringType, ss.AllowDeployPaths)
+	diags.Append(d...)
+	model.AllowDeployPaths = allowPaths
+
+	ignorePaths, d := types.ListValueFrom(ctx, types.StringType, ss.IgnoreDeployPaths)
+	diags.Append(d...)
+	model.IgnoreDeployPaths = ignorePaths
+
 	return diags
 }
 
 // buildCreateRequest constructs a CreateStaticSiteRequest from the Terraform plan model.
-func buildCreateRequest(model *StaticSiteResourceModel) *client.CreateStaticSiteRequest {
+func buildCreateRequest(ctx context.Context, model *StaticSiteResourceModel) *client.CreateStaticSiteRequest {
 	req := &client.CreateStaticSiteRequest{
 		DisplayName:   model.DisplayName.ValueString(),
 		RepoURL:       model.RepoURL.ValueString(),
@@ -134,6 +145,16 @@ func buildCreateRequest(model *StaticSiteResourceModel) *client.CreateStaticSite
 		v := model.ErrorFile.ValueString()
 		req.ErrorFile = &v
 	}
+	if !model.AllowDeployPaths.IsNull() && !model.AllowDeployPaths.IsUnknown() {
+		var paths []string
+		model.AllowDeployPaths.ElementsAs(ctx, &paths, false)
+		req.AllowDeployPaths = paths
+	}
+	if !model.IgnoreDeployPaths.IsNull() && !model.IgnoreDeployPaths.IsUnknown() {
+		var paths []string
+		model.IgnoreDeployPaths.ElementsAs(ctx, &paths, false)
+		req.IgnoreDeployPaths = paths
+	}
 	if !model.ProjectID.IsNull() && !model.ProjectID.IsUnknown() {
 		v := model.ProjectID.ValueString()
 		req.ProjectID = &v
@@ -143,7 +164,7 @@ func buildCreateRequest(model *StaticSiteResourceModel) *client.CreateStaticSite
 }
 
 // buildUpdateRequest constructs an UpdateStaticSiteRequest from the Terraform plan model.
-func buildUpdateRequest(_ context.Context, plan *StaticSiteResourceModel, state *StaticSiteResourceModel) *client.UpdateStaticSiteRequest {
+func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, state *StaticSiteResourceModel) *client.UpdateStaticSiteRequest {
 	req := &client.UpdateStaticSiteRequest{}
 
 	if !plan.DisplayName.Equal(state.DisplayName) {
@@ -201,6 +222,16 @@ func buildUpdateRequest(_ context.Context, plan *StaticSiteResourceModel, state 
 	if !plan.ErrorFile.IsNull() && !plan.ErrorFile.IsUnknown() && !plan.ErrorFile.Equal(state.ErrorFile) {
 		v := plan.ErrorFile.ValueString()
 		req.ErrorFile = &v
+	}
+	if !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
+		var paths []string
+		plan.AllowDeployPaths.ElementsAs(ctx, &paths, false)
+		req.AllowDeployPaths = paths
+	}
+	if !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
+		var paths []string
+		plan.IgnoreDeployPaths.ElementsAs(ctx, &paths, false)
+		req.IgnoreDeployPaths = paths
 	}
 
 	return req
