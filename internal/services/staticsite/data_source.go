@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -93,6 +94,16 @@ func (d *staticSiteDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 			"error_file": schema.StringAttribute{
 				Description: "The error file for the static site.",
 				Computed:    true,
+			},
+			"allow_deploy_paths": schema.ListAttribute{
+				Description: "Paths that trigger a deployment when changed.",
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"ignore_deploy_paths": schema.ListAttribute{
+				Description: "Paths to ignore for deployment triggers.",
+				Computed:    true,
+				ElementType: types.StringType,
 			},
 			"name": schema.StringAttribute{
 				Description: "The system-generated name of the static site.",

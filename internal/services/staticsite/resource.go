@@ -8,9 +8,11 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -149,6 +151,24 @@ func (r *staticSiteResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"allow_deploy_paths": schema.ListAttribute{
+				Description: "List of paths that trigger a deployment when changed.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"ignore_deploy_paths": schema.ListAttribute{
+				Description: "List of paths to ignore when determining whether to trigger a deployment.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
+			},
 			// Computed-only attributes
 			"name": schema.StringAttribute{
 				Description: "The system-generated name of the static site.",
@@ -214,7 +234,7 @@ func (r *staticSiteResource) Create(ctx context.Context, req resource.CreateRequ
 		return
 	}
 
-	createReq := buildCreateRequest(&plan)
+	createReq := buildCreateRequest(ctx, &plan)
 
 	createResult, err := r.client.CreateStaticSite(ctx, createReq)
 	if err != nil {
