@@ -3,12 +3,17 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
 type OpenAPISpec struct {
+	Servers []struct {
+		URL string `json:"url"`
+	} `json:"servers"`
 	Paths map[string]map[string]interface{} `json:"paths"`
 }
 
@@ -30,10 +35,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	basePath := serverBasePath(spec)
+
 	hasBreaking := false
 
 	for _, ep := range client.UsedEndpoints {
-		pathItem, ok := spec.Paths[ep.Path]
+		lookup := stripBase(ep.Path, basePath)
+		pathItem, ok := spec.Paths[lookup]
 		if !ok {
 			fmt.Printf("BREAKING: endpoint removed: %s %s\n", ep.Method, ep.Path)
 			hasBreaking = true
@@ -56,6 +64,39 @@ func main() {
 	}
 
 	fmt.Println("\nAll endpoints OK.")
+}
+
+// serverBasePath extracts the base path (e.g. "/v3") from servers[0].url so
+// that endpoint paths registered as "/v3/foo" match the spec's "/foo" keys.
+func serverBasePath(spec OpenAPISpec) string {
+	if len(spec.Servers) == 0 {
+		return ""
+	}
+	raw := spec.Servers[0].URL
+	if raw == "" {
+		return ""
+	}
+	if u, err := url.Parse(raw); err == nil && u.Path != "" {
+		return strings.TrimRight(u.Path, "/")
+	}
+	if i := strings.Index(raw, "://"); i >= 0 {
+		rest := raw[i+3:]
+		if j := strings.Index(rest, "/"); j >= 0 {
+			return strings.TrimRight(rest[j:], "/")
+		}
+		return ""
+	}
+	return strings.TrimRight(raw, "/")
+}
+
+func stripBase(path, base string) string {
+	if base == "" {
+		return path
+	}
+	if strings.HasPrefix(path, base+"/") || path == base {
+		return strings.TrimPrefix(path, base)
+	}
+	return path
 }
 
 func methodToLower(method string) string {
