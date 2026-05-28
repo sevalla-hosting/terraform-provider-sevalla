@@ -67,6 +67,10 @@ func (d *staticSiteDataSource) Schema(_ context.Context, _ datasource.SchemaRequ
 				Description: "Whether preview deployments are enabled.",
 				Computed:    true,
 			},
+			"git_lfs_enabled": schema.BoolAttribute{
+				Description: "Whether Git LFS objects are fetched during the source checkout step.",
+				Computed:    true,
+			},
 			"install_command": schema.StringAttribute{
 				Description: "The install command.",
 				Computed:    true,

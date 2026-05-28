@@ -19,6 +19,7 @@ type StaticSiteResourceModel struct {
 	ProjectID          types.String `tfsdk:"project_id"`
 	AutoDeploy         types.Bool   `tfsdk:"auto_deploy"`
 	IsPreviewEnabled   types.Bool   `tfsdk:"is_preview_enabled"`
+	GitLFSEnabled      types.Bool   `tfsdk:"git_lfs_enabled"`
 	InstallCommand     types.String `tfsdk:"install_command"`
 	BuildCommand       types.String `tfsdk:"build_command"`
 	PublishedDirectory types.String `tfsdk:"published_directory"`
@@ -62,6 +63,7 @@ func flattenStaticSite(ctx context.Context, ss *client.StaticSite, model *Static
 	model.Source = types.StringValue(ss.Source)
 	model.AutoDeploy = types.BoolValue(ss.AutoDeploy)
 	model.IsPreviewEnabled = types.BoolValue(ss.IsPreviewEnabled)
+	model.GitLFSEnabled = types.BoolValue(ss.GitLFSEnabled)
 	model.CreatedAt = types.StringValue(ss.CreatedAt)
 	model.UpdatedAt = types.StringValue(ss.UpdatedAt)
 
@@ -194,6 +196,10 @@ func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, stat
 	if !plan.IsPreviewEnabled.IsNull() && !plan.IsPreviewEnabled.IsUnknown() && !plan.IsPreviewEnabled.Equal(state.IsPreviewEnabled) {
 		v := plan.IsPreviewEnabled.ValueBool()
 		req.IsPreviewEnabled = &v
+	}
+	if !plan.GitLFSEnabled.IsNull() && !plan.GitLFSEnabled.IsUnknown() && !plan.GitLFSEnabled.Equal(state.GitLFSEnabled) {
+		v := plan.GitLFSEnabled.ValueBool()
+		req.GitLFSEnabled = &v
 	}
 	if !plan.Source.IsNull() && !plan.Source.IsUnknown() && !plan.Source.Equal(state.Source) {
 		v := plan.Source.ValueString()

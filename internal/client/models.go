@@ -23,6 +23,7 @@ type Application struct {
 	Type                       string            `json:"type"`
 	Status                     *string           `json:"status"`
 	BuildCacheEnabled          bool              `json:"build_cache_enabled"`
+	GitLFSEnabled              bool              `json:"git_lfs_enabled"`
 	HibernationEnabled         bool              `json:"hibernation_enabled"`
 	HibernateAfterSeconds      *int64            `json:"hibernate_after_seconds"`
 	AutoDeploy                 bool              `json:"auto_deploy"`
@@ -71,6 +72,7 @@ type UpdateApplicationRequest struct {
 	DockerfilePath             *string           `json:"dockerfile_path,omitempty"`
 	DockerContext              *string           `json:"docker_context,omitempty"`
 	BuildCacheEnabled          *bool             `json:"build_cache_enabled,omitempty"`
+	GitLFSEnabled              *bool             `json:"git_lfs_enabled,omitempty"`
 	DockerRegistryCredentialID *string           `json:"docker_registry_credential_id,omitempty"`
 	PackBuilder                *string           `json:"pack_builder,omitempty"`
 	NixpacksVersion            *string           `json:"nixpacks_version,omitempty"`

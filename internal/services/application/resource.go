@@ -127,6 +127,14 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"git_lfs_enabled": schema.BoolAttribute{
+				Description: "Whether Git LFS objects are fetched during the source checkout step. Enabled by default.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"hibernation_enabled": schema.BoolAttribute{
 				Description: "Whether hibernation is enabled for the application.",
 				Optional:    true,
