@@ -20,6 +20,7 @@ type StaticSite struct {
 	DefaultBranch      *string `json:"default_branch"`
 	AutoDeploy         bool    `json:"auto_deploy"`
 	IsPreviewEnabled   bool    `json:"is_preview_enabled"`
+	GitLFSEnabled      bool    `json:"git_lfs_enabled"`
 	GitType            *string `json:"git_type"`
 	Hostname           *string `json:"hostname"`
 	InstallCommand     *string `json:"install_command"`
@@ -63,6 +64,7 @@ type UpdateStaticSiteRequest struct {
 	NodeVersion        *string `json:"node_version,omitempty"`
 	PublishedDirectory *string `json:"published_directory,omitempty"`
 	IsPreviewEnabled   *bool   `json:"is_preview_enabled,omitempty"`
+	GitLFSEnabled      *bool   `json:"git_lfs_enabled,omitempty"`
 	Source             *string `json:"source,omitempty"`
 	GitType            *string `json:"git_type,omitempty"`
 	RepoURL            *string `json:"repo_url,omitempty"`

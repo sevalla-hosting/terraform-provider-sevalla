@@ -87,6 +87,10 @@ func (d *applicationDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 				Description: "Whether the build cache is enabled.",
 				Computed:    true,
 			},
+			"git_lfs_enabled": schema.BoolAttribute{
+				Description: "Whether Git LFS objects are fetched during the source checkout step.",
+				Computed:    true,
+			},
 			"hibernation_enabled": schema.BoolAttribute{
 				Description: "Whether hibernation is enabled.",
 				Computed:    true,

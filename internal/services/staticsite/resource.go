@@ -95,6 +95,14 @@ func (r *staticSiteResource) Schema(_ context.Context, _ resource.SchemaRequest,
 					boolplanmodifier.UseStateForUnknown(),
 				},
 			},
+			"git_lfs_enabled": schema.BoolAttribute{
+				Description: "Whether Git LFS objects are fetched during the source checkout step. Enabled by default.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
 			"install_command": schema.StringAttribute{
 				Description: "The install command to run.",
 				Optional:    true,
@@ -243,6 +251,18 @@ func (r *staticSiteResource) Create(ctx context.Context, req resource.CreateRequ
 			"Could not create static site, unexpected error: "+err.Error(),
 		)
 		return
+	}
+
+	// The create endpoint does not accept git_lfs_enabled; apply it via update.
+	if !plan.GitLFSEnabled.IsNull() && !plan.GitLFSEnabled.IsUnknown() {
+		v := plan.GitLFSEnabled.ValueBool()
+		if _, err := r.client.UpdateStaticSite(ctx, createResult.ID, &client.UpdateStaticSiteRequest{GitLFSEnabled: &v}); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Static Site After Create",
+				"Static site was created but failed to apply git_lfs_enabled: "+err.Error(),
+			)
+			return
+		}
 	}
 
 	// Create response may be incomplete — do a GET to retrieve the full object.

@@ -25,6 +25,7 @@ type ApplicationResourceModel struct {
 	BuildType                  types.String `tfsdk:"build_type"`
 	BuildPath                  types.String `tfsdk:"build_path"`
 	BuildCacheEnabled          types.Bool   `tfsdk:"build_cache_enabled"`
+	GitLFSEnabled              types.Bool   `tfsdk:"git_lfs_enabled"`
 	HibernationEnabled         types.Bool   `tfsdk:"hibernation_enabled"`
 	HibernateAfterSeconds      types.Int64  `tfsdk:"hibernate_after_seconds"`
 	DockerfilePath             types.String `tfsdk:"dockerfile_path"`
@@ -77,6 +78,7 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 	model.Type = types.StringValue(app.Type)
 	model.AutoDeploy = types.BoolValue(app.AutoDeploy)
 	model.BuildCacheEnabled = types.BoolValue(app.BuildCacheEnabled)
+	model.GitLFSEnabled = types.BoolValue(app.GitLFSEnabled)
 	model.HibernationEnabled = types.BoolValue(app.HibernationEnabled)
 	model.WaitForChecks = types.BoolValue(app.WaitForChecks)
 	model.IsSuspended = types.BoolValue(app.IsSuspended)
@@ -238,6 +240,10 @@ func buildUpdateRequest(ctx context.Context, plan *ApplicationResourceModel, sta
 		v := plan.BuildCacheEnabled.ValueBool()
 		req.BuildCacheEnabled = &v
 	}
+	if !plan.GitLFSEnabled.IsNull() && !plan.GitLFSEnabled.IsUnknown() && !plan.GitLFSEnabled.Equal(state.GitLFSEnabled) {
+		v := plan.GitLFSEnabled.ValueBool()
+		req.GitLFSEnabled = &v
+	}
 	if !plan.DockerRegistryCredentialID.IsNull() && !plan.DockerRegistryCredentialID.IsUnknown() && !plan.DockerRegistryCredentialID.Equal(state.DockerRegistryCredentialID) {
 		v := plan.DockerRegistryCredentialID.ValueString()
 		req.DockerRegistryCredentialID = &v
@@ -313,6 +319,11 @@ func buildPostCreateUpdateRequest(ctx context.Context, plan *ApplicationResource
 	if !plan.BuildCacheEnabled.IsNull() && !plan.BuildCacheEnabled.IsUnknown() {
 		v := plan.BuildCacheEnabled.ValueBool()
 		req.BuildCacheEnabled = &v
+		hasFields = true
+	}
+	if !plan.GitLFSEnabled.IsNull() && !plan.GitLFSEnabled.IsUnknown() {
+		v := plan.GitLFSEnabled.ValueBool()
+		req.GitLFSEnabled = &v
 		hasFields = true
 	}
 	if !plan.HibernationEnabled.IsNull() && !plan.HibernationEnabled.IsUnknown() {
