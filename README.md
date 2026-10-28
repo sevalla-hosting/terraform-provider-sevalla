@@ -7,7 +7,7 @@
 **Manage your Sevalla infrastructure as code.**
 
 [![Tests](https://github.com/sevalla/terraform-provider-sevalla/actions/workflows/test.yml/badge.svg)](https://github.com/sevalla/terraform-provider-sevalla/actions/workflows/test.yml)
-[![Release](https://img.shields.io/github/v/release/sevalla/terraform-provider-sevalla?color=57534e)](https://registry.terraform.io/providers/sevalla-hosting/sevalla/latest)
+[![Release](https://img.shields.io/github/v/release/sevalla/terraform-provider-sevalla?color=57534e)](https://registry.terraform.io/providers/sevalla/sevalla/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-57534e)](LICENSE)
 [![Terraform](https://img.shields.io/badge/Terraform-1.0+-57534e?logo=terraform&logoColor=white)](https://www.terraform.io/)
 
@@ -23,8 +23,8 @@ A [Terraform](https://www.terraform.io/) provider for [Sevalla](https://sevalla.
 terraform {
   required_providers {
     sevalla = {
-      source  = "sevalla-hosting/sevalla"
-      version = "~> 1.0"
+      source  = "sevalla/sevalla"
+      version = "~> 1.2"
     }
   }
 }
@@ -50,6 +50,15 @@ terraform plan
 terraform apply
 ```
 
+
+## Upgrading from `sevalla-hosting/sevalla`
+
+The provider moved to the `sevalla` namespace, and `sevalla-hosting/sevalla` no longer receives new versions. Set `source = "sevalla/sevalla"` in `required_providers`, then point existing state at the new address:
+
+```sh
+terraform state replace-provider registry.terraform.io/sevalla-hosting/sevalla registry.terraform.io/sevalla/sevalla
+terraform init -upgrade
+```
 ## Resources
 
 | Resource | Description |
@@ -151,7 +160,7 @@ To use a locally built provider, add a dev override to `~/.terraformrc`:
 ```hcl
 provider_installation {
   dev_overrides {
-    "sevalla-hosting/sevalla" = "/path/to/terraform-provider-sevalla"
+    "sevalla/sevalla" = "/path/to/terraform-provider-sevalla"
   }
   direct {}
 }

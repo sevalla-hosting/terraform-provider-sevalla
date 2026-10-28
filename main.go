@@ -8,7 +8,7 @@ import (
 	"log"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/provider"
+	"github.com/sevalla/terraform-provider-sevalla/internal/provider"
 )
 
 var version = "dev"
@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/sevalla-hosting/sevalla",
+		Address: "registry.terraform.io/sevalla/sevalla",
 		Debug:   debug,
 	}
 

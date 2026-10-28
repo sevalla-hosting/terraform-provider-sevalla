@@ -13,19 +13,19 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/apikey"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/application"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/database"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/dockerregistry"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/globalenvvar"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/loadbalancer"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/objectstorage"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/pipeline"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/project"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/referencedata"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/staticsite"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/webhook"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/apikey"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/application"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/database"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/dockerregistry"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/globalenvvar"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/loadbalancer"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/objectstorage"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/pipeline"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/project"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/referencedata"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/staticsite"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/webhook"
 )
 
 var _ provider.Provider = &SevallaProvider{}
@@ -93,7 +93,7 @@ func (p *SevallaProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	userAgent := fmt.Sprintf("terraform-provider-sevalla/%s (+https://registry.terraform.io/providers/sevalla-hosting/sevalla) Terraform/%s", p.version, req.TerraformVersion)
+	userAgent := fmt.Sprintf("terraform-provider-sevalla/%s (+https://registry.terraform.io/providers/sevalla/sevalla) Terraform/%s", p.version, req.TerraformVersion)
 	opts := []client.Option{client.WithUserAgent(userAgent)}
 	if apiURL := os.Getenv("SEVALLA_API_URL"); apiURL != "" {
 		parsed, err := url.Parse(apiURL)

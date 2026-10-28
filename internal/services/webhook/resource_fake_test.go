@@ -9,7 +9,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/testutil"
+	"github.com/sevalla/terraform-provider-sevalla/internal/testutil"
 )
 
 // fakeWebhookAPI enables new webhooks and reorders allowed_events, so the
