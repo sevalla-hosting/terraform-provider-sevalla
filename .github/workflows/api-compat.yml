@@ -21,30 +21,35 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      # The snapshot is stored sorted and pretty-printed so that update PRs show readable diffs.
       - name: Fetch live OpenAPI spec
-        run: curl -sSf https://api.sevalla.com/v3/openapi.json -o openapi-live.json
+        run: |
+          curl -sSf https://api.sevalla.com/v3/openapi.json |
+            python3 -c 'import json,sys; json.dump(json.load(sys.stdin), sys.stdout, indent=2, sort_keys=True, ensure_ascii=False); print()' > openapi-live.json
 
       - name: Compare specs
         id: diff
         run: |
-          if diff -q openapi.json openapi-live.json > /dev/null 2>&1; then
-            echo "changed=false" >> $GITHUB_OUTPUT
+          if cmp -s openapi.json openapi-live.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run compatibility checker
         if: steps.diff.outputs.changed == 'true'
         id: compat
         run: |
-          result=$(go run ./internal/tools/apicompat/ 2>&1) || true
-          echo "result<<EOF" >> $GITHUB_OUTPUT
-          echo "$result" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          result=$(go run ./internal/tools/apicompat/ openapi-live.json 2>&1) || true
+          {
+            echo "result<<EOF"
+            echo "$result"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
           if echo "$result" | grep -q "BREAKING"; then
-            echo "breaking=true" >> $GITHUB_OUTPUT
+            echo "breaking=true" >> "$GITHUB_OUTPUT"
           else
-            echo "breaking=false" >> $GITHUB_OUTPUT
+            echo "breaking=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Open issue for breaking changes
@@ -52,11 +57,27 @@ jobs:
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
+            const body = `The weekly API compatibility check detected breaking changes.\n\n\`\`\`\n${process.env.RESULT}\n\`\`\``;
+            const { data: open } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'api-compat',
+              state: 'open',
+            });
+            if (open.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: open[0].number,
+                body,
+              });
+              return;
+            }
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: 'API Breaking Change Detected',
-              body: `The weekly API compatibility check detected breaking changes.\n\n\`\`\`\n${process.env.RESULT}\n\`\`\``,
+              body,
               labels: ['api-compat', 'breaking-change']
             });
         env:
@@ -65,7 +86,7 @@ jobs:
       - name: Update spec and open PR for non-breaking changes
         if: steps.diff.outputs.changed == 'true' && steps.compat.outputs.breaking == 'false'
         run: |
-          cp openapi-live.json openapi.json
+          mv openapi-live.json openapi.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           branch="api-compat/update-$(date +%Y%m%d)"
@@ -74,6 +95,6 @@ jobs:
           git add openapi.json
           git commit -m "chore: update OpenAPI spec snapshot"
           git push origin "$branch"
-          gh pr create --title "chore: Update OpenAPI spec snapshot" --body "Automated update from weekly API compatibility check." --base main
+          gh pr create --title "chore: Update OpenAPI spec snapshot" --body "Automated update from the weekly API compatibility check. Review the spec diff for new or changed fields the provider should support." --base main
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

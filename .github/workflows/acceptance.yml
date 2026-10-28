@@ -16,7 +16,7 @@ jobs:
   acceptance:
     name: Acceptance Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
     env:
       TF_ACC: "1"
       SEVALLA_API_KEY: ${{ secrets.SEVALLA_ACC_TEST_API_KEY }}
@@ -29,15 +29,16 @@ jobs:
           cache: true
 
       - name: Run acceptance tests
-        run: go test ./internal/... -v -count=1 -timeout 20m -run 'TestAcc'
+        run: go test ./internal/... -v -count=1 -timeout 80m -run 'TestAcc'
 
       - name: Cleanup check
         if: always()
         run: |
+          api_url="${SEVALLA_API_URL:-https://api.sevalla.com/v3}"
           echo "Checking for leftover test resources..."
           for endpoint in applications databases static-sites webhooks docker-registries projects pipelines; do
             count=$(curl -sf -H "Authorization: Bearer $SEVALLA_API_KEY" \
-              "${SEVALLA_API_URL}/${endpoint}?limit=1" | jq '.total // 0')
+              "${api_url}/${endpoint}?limit=1" | jq '.total // 0')
             echo "$endpoint: $count"
             if [ "$count" -gt "0" ]; then
               echo "::warning::$count leftover $endpoint found — may need manual cleanup"

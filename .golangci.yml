@@ -9,3 +9,7 @@ linters:
         - (*encoding/json.Encoder).Encode
         - (*encoding/json.Decoder).Decode
         - io.Copy
+
+formatters:
+  enable:
+    - gofmt
