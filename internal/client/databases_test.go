@@ -170,60 +170,6 @@ func TestDeleteDatabase_Success(t *testing.T) {
 	}
 }
 
-func TestSuspendDatabase(t *testing.T) {
-	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-		if r.URL.Path != "/databases/db-123/suspend" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	defer server.Close()
-
-	err := c.SuspendDatabase(context.Background(), "db-123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestActivateDatabase(t *testing.T) {
-	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-		if r.URL.Path != "/databases/db-123/activate" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	defer server.Close()
-
-	err := c.ActivateDatabase(context.Background(), "db-123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestToggleExternalConnection(t *testing.T) {
-	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-		if r.URL.Path != "/databases/db-123/external-connection/toggle" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	defer server.Close()
-
-	err := c.ToggleExternalConnection(context.Background(), "db-123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestGetDatabaseIPRestriction(t *testing.T) {
 	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

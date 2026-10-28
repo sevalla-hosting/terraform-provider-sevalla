@@ -61,11 +61,11 @@ func (d *processResourceTypesDataSource) Schema(_ context.Context, _ datasource.
 							Computed:    true,
 						},
 						"memory_limit": schema.Int64Attribute{
-							Description: "The memory limit in bytes.",
+							Description: "The memory limit in megabytes.",
 							Computed:    true,
 						},
 						"category": schema.StringAttribute{
-							Description: "The category of the process resource type.",
+							Description: "The category of the process resource type: `hobby`, `standard`, `cpuOptimized` or `memoryOptimized`.",
 							Computed:    true,
 						},
 					},

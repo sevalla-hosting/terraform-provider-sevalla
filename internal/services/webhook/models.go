@@ -42,7 +42,11 @@ func flattenWebhook(ctx context.Context, w *client.Webhook, model *WebhookResour
 	model.CreatedAt = types.StringValue(w.CreatedAt)
 	model.UpdatedAt = types.StringValue(w.UpdatedAt)
 
-	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, w.AllowedEvents)
+	var prior []string
+	if !model.AllowedEvents.IsNull() && !model.AllowedEvents.IsUnknown() {
+		diags.Append(model.AllowedEvents.ElementsAs(ctx, &prior, false)...)
+	}
+	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, keepOrder(prior, w.AllowedEvents))
 	diags.Append(d...)
 	model.AllowedEvents = allowedEvents
 
@@ -64,9 +68,8 @@ func buildCreateRequest(ctx context.Context, model *WebhookResourceModel) (*clie
 		Endpoint:      model.Endpoint.ValueString(),
 	}
 
-	if !model.Description.IsNull() && !model.Description.IsUnknown() {
-		v := model.Description.ValueString()
-		req.Description = &v
+	if !model.Description.IsUnknown() {
+		req.Description = model.Description.ValueStringPointer()
 	}
 
 	return req, diags
@@ -87,15 +90,30 @@ func buildUpdateRequest(ctx context.Context, plan *WebhookResourceModel, state *
 		req.AllowedEvents = allowedEvents
 	}
 	if !plan.Description.Equal(state.Description) {
-		if plan.Description.IsNull() {
-			req.Description = nil
-		} else {
-			v := plan.Description.ValueString()
-			req.Description = &v
-		}
+		// A null plan value is sent as JSON null to clear the description.
+		req.Description = client.NullableOf(plan.Description.ValueStringPointer())
 	}
 
 	return req, diags
+}
+
+// keepOrder returns prior when it holds the same elements as got, so a
+// server-side reordering does not show up as a diff.
+func keepOrder[T comparable](prior, got []T) []T {
+	if len(prior) != len(got) {
+		return got
+	}
+	counts := make(map[T]int, len(got))
+	for _, v := range got {
+		counts[v]++
+	}
+	for _, v := range prior {
+		if counts[v] == 0 {
+			return got
+		}
+		counts[v]--
+	}
+	return prior
 }
 
 // optionalString converts a *string to a types.String, returning null for nil pointers.

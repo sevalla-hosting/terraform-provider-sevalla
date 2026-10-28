@@ -49,11 +49,10 @@ func TestAccStaticSiteEnvironmentVariable_basic(t *testing.T) {
 			},
 			// Step 2: Import
 			{
-				ResourceName:            resourceName,
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"value"},
-				ImportStateIdFunc:       testAccStaticSiteSubResourceImportStateIdFunc(resourceName, "static_site_id", "id"),
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: testAccStaticSiteSubResourceImportStateIdFunc(resourceName, "static_site_id", "id"),
 			},
 			// Step 3: Update value
 			{
@@ -61,6 +60,8 @@ func TestAccStaticSiteEnvironmentVariable_basic(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "key", "TF_TEST_VAR"),
 					resource.TestCheckResourceAttr(resourceName, "value", "updated"),
+					resource.TestCheckResourceAttr(resourceName, "is_production", "true"),
+					resource.TestCheckResourceAttr(resourceName, "is_preview", "true"),
 				),
 			},
 		},

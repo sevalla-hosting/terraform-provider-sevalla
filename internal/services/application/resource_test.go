@@ -32,8 +32,6 @@ func TestAccApplication_basic(t *testing.T) {
 				ResourceName:      "sevalla_application.test",
 				ImportState:       true,
 				ImportStateVerify: true,
-				// cluster_id is not returned by the API on import
-				ImportStateVerifyIgnore: []string{"cluster_id"},
 			},
 			// Update
 			{

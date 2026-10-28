@@ -3,13 +3,16 @@ package globalenvvar
 import (
 	"context"
 	"fmt"
+	"regexp"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -27,6 +30,8 @@ func NewResource() resource.Resource {
 	return &globalEnvVarResource{}
 }
 
+var envVarKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
+
 func (r *globalEnvVarResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_global_environment_variable"
 }
@@ -43,29 +48,30 @@ func (r *globalEnvVarResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"key": schema.StringAttribute{
-				Description: "The key of the environment variable.",
+				Description: "The key of the environment variable. Must be unique across the company's global variables and contain only letters, digits, `-`, `_`, `.` or `:`.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+					stringvalidator.RegexMatches(envVarKeyPattern, "must contain only letters, digits, -, _, . or :"),
+				},
 			},
 			"value": schema.StringAttribute{
-				Description: "The value of the environment variable.",
+				Description: "The value of the environment variable (at most 32768 characters).",
 				Required:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.LengthAtMost(32768)},
 			},
 			"is_runtime": schema.BoolAttribute{
-				Description: "Whether this environment variable is available at runtime.",
+				Description: "Whether this environment variable is available at runtime. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
+				Default:     booldefault.StaticBool(true),
 			},
 			"is_buildtime": schema.BoolAttribute{
-				Description: "Whether this environment variable is available at build time.",
+				Description: "Whether this environment variable is available at build time. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
+				Default:     booldefault.StaticBool(true),
 			},
 			"created_at": schema.StringAttribute{
 				Description: "The timestamp when the global environment variable was created.",
@@ -191,7 +197,7 @@ func (r *globalEnvVarResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	err := r.client.DeleteGlobalEnvVar(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Global Environment Variable",
 			"Could not delete global environment variable ID "+state.ID.ValueString()+": "+err.Error(),

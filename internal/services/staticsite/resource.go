@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -46,37 +49,40 @@ func (r *staticSiteResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "The display name of the static site.",
+				Description: "The display name of the static site (2-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 64)},
 			},
 			"source": schema.StringAttribute{
-				Description: "The source type of the static site. Valid values: privateGit, publicGit.",
+				Description: "The source type of the static site. Valid values: `publicGit` (default), `privateGit`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("publicGit"),
+				Validators:  []validator.String{stringvalidator.OneOf("privateGit", "publicGit")},
 			},
 			"git_type": schema.StringAttribute{
-				Description: "The Git provider type. Valid values: github, bitbucket, gitlab.",
+				Description: "The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`. Null for public Git sources.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Validators:  []validator.String{stringvalidator.OneOf("github", "bitbucket", "gitlab")},
 			},
 			"repo_url": schema.StringAttribute{
 				Description: "The repository URL for the static site source.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 2048)},
 			},
 			"default_branch": schema.StringAttribute{
 				Description: "The default branch to deploy from.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The project ID to associate with this static site.",
+				Description: "The ID of the project to group the static site under. The API cannot move a static site between projects, so changing this creates a new static site.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"auto_deploy": schema.BoolAttribute{
@@ -136,9 +142,10 @@ func (r *staticSiteResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"node_version": schema.StringAttribute{
-				Description: "The Node.js version to use for building.",
+				Description: "The Node.js version used to build the site. Valid values: `16`, `18`, `20`, `22`, `lts`, `latest`. Required by the API when `build_command` or `install_command` is set.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("16", "18", "20", "22", "lts", "latest")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -160,16 +167,19 @@ func (r *staticSiteResource) Schema(_ context.Context, _ resource.SchemaRequest,
 				},
 			},
 			"allow_deploy_paths": schema.ListAttribute{
-				Description: "List of paths that trigger a deployment when changed.",
+				Description: "Glob patterns of paths that trigger an automatic deployment when changed. Conflicts with `ignore_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
+				Validators: []validator.List{
+					listvalidator.ConflictsWith(path.MatchRoot("ignore_deploy_paths")),
+				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"ignore_deploy_paths": schema.ListAttribute{
-				Description: "List of paths to ignore when determining whether to trigger a deployment.",
+				Description: "Glob patterns of paths that never trigger an automatic deployment. Conflicts with `allow_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -252,6 +262,8 @@ func (r *staticSiteResource) Create(ctx context.Context, req resource.CreateRequ
 		)
 		return
 	}
+	// Save the ID first so a failure below leaves a tainted resource instead of an orphan.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), createResult.ID)...)
 
 	// The create endpoint does not accept git_lfs_enabled; apply it via update.
 	if !plan.GitLFSEnabled.IsNull() && !plan.GitLFSEnabled.IsUnknown() {
@@ -359,7 +371,7 @@ func (r *staticSiteResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	err := r.client.DeleteStaticSite(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Static Site",
 			"Could not delete static site ID "+state.ID.ValueString()+": "+err.Error(),

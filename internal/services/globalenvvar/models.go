@@ -21,8 +21,8 @@ func flattenGlobalEnvVar(e *client.GlobalEnvironmentVariable, model *GlobalEnvVa
 	model.ID = types.StringValue(e.ID)
 	model.Key = types.StringValue(e.Key)
 	model.Value = types.StringValue(e.Value)
-	model.IsRuntime = optionalBool(e.IsRuntime)
-	model.IsBuildtime = optionalBool(e.IsBuildtime)
+	model.IsRuntime = boolOrTrue(e.IsRuntime)
+	model.IsBuildtime = boolOrTrue(e.IsBuildtime)
 	model.CreatedAt = types.StringValue(e.CreatedAt)
 	model.UpdatedAt = types.StringValue(e.UpdatedAt)
 }
@@ -74,10 +74,7 @@ func optionalStringPtr(s types.String) *string {
 	return &v
 }
 
-// optionalBool converts a *bool to a types.Bool, returning null for nil pointers.
-func optionalBool(b *bool) types.Bool {
-	if b == nil {
-		return types.BoolNull()
-	}
-	return types.BoolValue(*b)
+// boolOrTrue maps a null flag to true, the API's documented default.
+func boolOrTrue(b *bool) types.Bool {
+	return types.BoolValue(b == nil || *b)
 }

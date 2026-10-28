@@ -73,21 +73,15 @@ func TestPaginate_MultiplePages(t *testing.T) {
 		WithHTTPClient(server.Client()),
 	)
 
-	// Note: Paginate uses limit=100 internally, so we simulate the API returning
-	// total > limit to trigger multiple pages. We use total=200 with limit=100.
-	// However, the test server above returns total=2 with limit=1, and the actual
-	// Paginate function uses its own limit=100. So let's make a proper test:
+	// The server reports total=2 but returns one item per page, so Paginate
+	// keeps requesting from the next offset until it has every item.
 	requestCount = 0
 	items, err := Paginate[ApplicationListItem](context.Background(), c, "/applications")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	// The paginator sends limit=100. Our server returns total=2 with the first
-	// offset=0 request, so offset(0)+limit(100) >= total(2), meaning it stops
-	// after one page.
-	if len(items) != 1 {
-		t.Errorf("expected 1 item from single request, got %d", len(items))
+	if len(items) != 2 || requestCount != 2 {
+		t.Errorf("expected 2 items from 2 requests, got %d items from %d requests", len(items), requestCount)
 	}
 
 	// Now test with a server that actually forces multiple pages

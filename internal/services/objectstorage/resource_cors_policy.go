@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -60,19 +63,25 @@ func (r *objectStorageCORSPolicyResource) Schema(_ context.Context, _ resource.S
 				},
 			},
 			"allowed_origins": schema.ListAttribute{
-				Description: "List of allowed origins.",
+				Description: "Origins allowed by the rule (1-100). Use `*` to allow all origins.",
 				Required:    true,
 				ElementType: types.StringType,
+				Validators:  []validator.List{listvalidator.SizeBetween(1, 100)},
 			},
 			"allowed_methods": schema.ListAttribute{
-				Description: "List of allowed HTTP methods.",
+				Description: "HTTP methods allowed by the rule. Valid values: `GET`, `PUT`, `POST`, `DELETE`, `HEAD`.",
 				Required:    true,
 				ElementType: types.StringType,
+				Validators: []validator.List{
+					listvalidator.SizeAtLeast(1),
+					listvalidator.ValueStringsAre(stringvalidator.OneOf("GET", "PUT", "POST", "DELETE", "HEAD")),
+				},
 			},
 			"allowed_headers": schema.ListAttribute{
-				Description: "List of allowed HTTP headers.",
+				Description: "HTTP headers allowed in CORS requests (1-100). Omit to allow no specific headers.",
 				Optional:    true,
 				ElementType: types.StringType,
+				Validators:  []validator.List{listvalidator.SizeBetween(1, 100)},
 			},
 		},
 	}
@@ -103,15 +112,21 @@ func (r *objectStorageCORSPolicyResource) Create(ctx context.Context, req resour
 	}
 
 	osID := plan.ObjectStorageID.ValueString()
-	createReq := &client.CreateCORSPolicyRequest{}
-
-	resp.Diagnostics.Append(plan.AllowedOrigins.ElementsAs(ctx, &createReq.AllowedOrigins, false)...)
-	resp.Diagnostics.Append(plan.AllowedMethods.ElementsAs(ctx, &createReq.AllowedMethods, false)...)
-	if !plan.AllowedHeaders.IsNull() && !plan.AllowedHeaders.IsUnknown() {
-		resp.Diagnostics.Append(plan.AllowedHeaders.ElementsAs(ctx, &createReq.AllowedHeaders, false)...)
-	}
+	createReq, diags := buildCORSPolicyRequest(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// The create response has no ID, so find the new policy by comparing lists.
+	before, err := r.client.ListCORSPolicies(ctx, osID)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Creating Object Storage CORS Policy", err.Error())
+		return
+	}
+	known := make(map[string]bool, len(before))
+	for _, p := range before {
+		known[p.ID] = true
 	}
 
 	if err := r.client.CreateCORSPolicy(ctx, osID, createReq); err != nil {
@@ -119,21 +134,33 @@ func (r *objectStorageCORSPolicyResource) Create(ctx context.Context, req resour
 		return
 	}
 
-	// POST response only returns {message}, so read back to get the created policy.
-	policies, err := r.client.ListCORSPolicies(ctx, osID)
+	after, err := r.client.ListCORSPolicies(ctx, osID)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Reading Object Storage CORS Policy after create", err.Error())
 		return
 	}
-
-	if len(policies) == 0 {
-		resp.Diagnostics.AddError("Error Creating Object Storage CORS Policy", "No policies found after create")
+	var created []client.CORSPolicy
+	for _, p := range after {
+		if !known[p.ID] {
+			created = append(created, p)
+		}
+	}
+	// Policies created concurrently on the same bucket are told apart by their rules.
+	if len(created) > 1 {
+		var matching []client.CORSPolicy
+		for _, p := range created {
+			if sameStrings(p.AllowedOrigins, createReq.AllowedOrigins) && sameStrings(p.AllowedMethods, createReq.AllowedMethods) && sameStrings(p.AllowedHeaders, createReq.AllowedHeaders) {
+				matching = append(matching, p)
+			}
+		}
+		created = matching
+	}
+	if len(created) != 1 {
+		resp.Diagnostics.AddError("Error Creating Object Storage CORS Policy", fmt.Sprintf("Could not identify the created policy: %d candidates found.", len(created)))
 		return
 	}
 
-	// Use the last policy in the list (most recently created).
-	created := &policies[len(policies)-1]
-	resp.Diagnostics.Append(flattenCORSPolicy(ctx, created, &plan)...)
+	resp.Diagnostics.Append(flattenCORSPolicy(ctx, &created[0], &plan)...)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -183,15 +210,14 @@ func (r *objectStorageCORSPolicyResource) Update(ctx context.Context, req resour
 	}
 
 	osID := state.ObjectStorageID.ValueString()
-	updateReq := &client.UpdateCORSPolicyRequest{}
-
-	resp.Diagnostics.Append(plan.AllowedOrigins.ElementsAs(ctx, &updateReq.AllowedOrigins, false)...)
-	resp.Diagnostics.Append(plan.AllowedMethods.ElementsAs(ctx, &updateReq.AllowedMethods, false)...)
-	if !plan.AllowedHeaders.IsNull() && !plan.AllowedHeaders.IsUnknown() {
-		resp.Diagnostics.Append(plan.AllowedHeaders.ElementsAs(ctx, &updateReq.AllowedHeaders, false)...)
-	}
+	updateReq, diags := buildCORSPolicyRequest(ctx, &plan)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	// Send an empty list to remove headers that were set before.
+	if updateReq.AllowedHeaders == nil {
+		updateReq.AllowedHeaders = []string{}
 	}
 
 	if err := r.client.UpdateCORSPolicy(ctx, osID, state.ID.ValueString(), updateReq); err != nil {
@@ -231,7 +257,7 @@ func (r *objectStorageCORSPolicyResource) Delete(ctx context.Context, req resour
 	}
 
 	err := r.client.DeleteCORSPolicy(ctx, state.ObjectStorageID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Object Storage CORS Policy", err.Error())
 		return
 	}
@@ -251,26 +277,60 @@ func (r *objectStorageCORSPolicyResource) ImportState(ctx context.Context, req r
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
+func buildCORSPolicyRequest(ctx context.Context, plan *ObjectStorageCORSPolicyResourceModel) (*client.CORSPolicyRequest, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	req := &client.CORSPolicyRequest{}
+	diags.Append(plan.AllowedOrigins.ElementsAs(ctx, &req.AllowedOrigins, false)...)
+	diags.Append(plan.AllowedMethods.ElementsAs(ctx, &req.AllowedMethods, false)...)
+	if !plan.AllowedHeaders.IsNull() && !plan.AllowedHeaders.IsUnknown() {
+		diags.Append(plan.AllowedHeaders.ElementsAs(ctx, &req.AllowedHeaders, false)...)
+	}
+	return req, diags
+}
+
 func flattenCORSPolicy(ctx context.Context, policy *client.CORSPolicy, model *ObjectStorageCORSPolicyResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	model.ID = types.StringValue(policy.ID)
-
-	origins, d := types.ListValueFrom(ctx, types.StringType, policy.AllowedOrigins)
-	diags.Append(d...)
-	model.AllowedOrigins = origins
-
-	methods, d := types.ListValueFrom(ctx, types.StringType, policy.AllowedMethods)
-	diags.Append(d...)
-	model.AllowedMethods = methods
-
-	if policy.AllowedHeaders != nil {
-		headers, d := types.ListValueFrom(ctx, types.StringType, policy.AllowedHeaders)
-		diags.Append(d...)
-		model.AllowedHeaders = headers
-	} else {
-		model.AllowedHeaders = types.ListNull(types.StringType)
+	model.AllowedOrigins = flattenStringList(ctx, model.AllowedOrigins, policy.AllowedOrigins, &diags)
+	model.AllowedMethods = flattenStringList(ctx, model.AllowedMethods, policy.AllowedMethods, &diags)
+	model.AllowedHeaders = types.ListNull(types.StringType)
+	if len(policy.AllowedHeaders) > 0 {
+		model.AllowedHeaders = flattenStringList(ctx, model.AllowedHeaders, policy.AllowedHeaders, &diags)
 	}
 
 	return diags
+}
+
+// flattenStringList keeps the order of prior when it holds the same elements
+// as got, so a server-side reordering does not show up as a diff.
+func flattenStringList(ctx context.Context, prior types.List, got []string, diags *diag.Diagnostics) types.List {
+	var priorValues []string
+	if !prior.IsNull() && !prior.IsUnknown() {
+		diags.Append(prior.ElementsAs(ctx, &priorValues, false)...)
+		if sameStrings(priorValues, got) {
+			got = priorValues
+		}
+	}
+	list, d := types.ListValueFrom(ctx, types.StringType, got)
+	diags.Append(d...)
+	return list
+}
+
+// sameStrings reports whether a and b hold the same elements in any order.
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	counts := make(map[string]int, len(a))
+	for _, v := range a {
+		counts[v]++
+	}
+	for _, v := range b {
+		if counts[v] == 0 {
+			return false
+		}
+		counts[v]--
+	}
+	return true
 }

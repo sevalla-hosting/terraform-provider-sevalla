@@ -22,7 +22,7 @@ func TestGetLoadBalancer_Success(t *testing.T) {
 			ID:          "lb-123",
 			Name:        "my-lb",
 			DisplayName: "My Load Balancer",
-			Type:        &lbType,
+			Type:        lbType,
 			CreatedAt:   "2025-01-01T00:00:00.000Z",
 			UpdatedAt:   "2025-01-01T00:00:00.000Z",
 		})
@@ -88,7 +88,7 @@ func TestCreateLoadBalancer_Success(t *testing.T) {
 			ID:          "lb-new",
 			Name:        "new-lb",
 			DisplayName: req.DisplayName,
-			Type:        &lbType,
+			Type:        lbType,
 			CreatedAt:   "2025-01-01T00:00:00.000Z",
 			UpdatedAt:   "2025-01-01T00:00:00.000Z",
 		})

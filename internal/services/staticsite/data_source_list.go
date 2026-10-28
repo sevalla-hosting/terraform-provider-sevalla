@@ -53,16 +53,19 @@ func (d *staticSiteListDataSource) Schema(_ context.Context, _ datasource.Schema
 							Computed:    true,
 						},
 						"source": schema.StringAttribute{
-							Description: "The source type of the static site.",
-							Computed:    true,
+							Description:        "Always null.",
+							DeprecationMessage: "The Sevalla API no longer returns this field when listing static sites. It is always null and will be removed in a future major version. Use the `sevalla_static_site` data source instead.",
+							Computed:           true,
 						},
 						"created_at": schema.StringAttribute{
-							Description: "When the static site was created.",
-							Computed:    true,
+							Description:        "Always null.",
+							DeprecationMessage: "The Sevalla API no longer returns this field when listing static sites. It is always null and will be removed in a future major version. Use the `sevalla_static_site` data source instead.",
+							Computed:           true,
 						},
 						"updated_at": schema.StringAttribute{
-							Description: "When the static site was last updated.",
-							Computed:    true,
+							Description:        "Always null.",
+							DeprecationMessage: "The Sevalla API no longer returns this field when listing static sites. It is always null and will be removed in a future major version. Use the `sevalla_static_site` data source instead.",
+							Computed:           true,
 						},
 					},
 				},
@@ -107,9 +110,9 @@ func (d *staticSiteListDataSource) Read(ctx context.Context, _ datasource.ReadRe
 			Name:        types.StringValue(site.Name),
 			DisplayName: types.StringValue(site.DisplayName),
 			Status:      optionalString(site.Status),
-			Source:      types.StringValue(site.Source),
-			CreatedAt:   types.StringValue(site.CreatedAt),
-			UpdatedAt:   types.StringValue(site.UpdatedAt),
+			Source:      types.StringNull(),
+			CreatedAt:   types.StringNull(),
+			UpdatedAt:   types.StringNull(),
 		}
 	}
 

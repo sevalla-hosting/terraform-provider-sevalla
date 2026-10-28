@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -42,8 +44,9 @@ func (r *projectResource) Schema(_ context.Context, _ resource.SchemaRequest, re
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "The display name of the project.",
+				Description: "The display name of the project (1-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 64)},
 			},
 			"name": schema.StringAttribute{
 				Description: "The system-generated name of the project.",
@@ -174,7 +177,7 @@ func (r *projectResource) Delete(ctx context.Context, req resource.DeleteRequest
 	}
 
 	err := r.client.DeleteProject(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Project",
 			"Could not delete project ID "+state.ID.ValueString()+": "+err.Error(),

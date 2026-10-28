@@ -1,10 +1,8 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -29,155 +27,23 @@ type CreateDomainRequest struct {
 	CustomSSLKey  *string `json:"custom_ssl_key,omitempty"`
 }
 
-func (c *SevallaClient) ListDomains(ctx context.Context, serviceType string, serviceID string) ([]Domain, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("%s/%s/domains", serviceType, serviceID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var domains []Domain
-	if err := json.NewDecoder(resp.Body).Decode(&domains); err != nil {
-		return nil, fmt.Errorf("decoding domains response: %w", err)
-	}
-
-	return domains, nil
-}
-
+// serviceType is the collection path of the owning service, e.g. "/applications".
 func (c *SevallaClient) GetDomain(ctx context.Context, serviceType string, serviceID string, domainID string) (*Domain, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("%s/%s/domains/%s", serviceType, serviceID, domainID), nil)
-	if err != nil {
+	var out Domain
+	if err := c.do(ctx, http.MethodGet, path(serviceType+"/%s/domains/%s", serviceID, domainID), nil, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var domain Domain
-	if err := json.NewDecoder(resp.Body).Decode(&domain); err != nil {
-		return nil, fmt.Errorf("decoding domain response: %w", err)
-	}
-
-	return &domain, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) CreateDomain(ctx context.Context, serviceType string, serviceID string, input *CreateDomainRequest) (*Domain, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create domain request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("%s/%s/domains", serviceType, serviceID), bytes.NewReader(body))
-	if err != nil {
+	var out Domain
+	if err := c.do(ctx, http.MethodPost, path(serviceType+"/%s/domains", serviceID), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var domain Domain
-	if err := json.NewDecoder(resp.Body).Decode(&domain); err != nil {
-		return nil, fmt.Errorf("decoding domain response: %w", err)
-	}
-
-	return &domain, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) DeleteDomain(ctx context.Context, serviceType string, serviceID string, domainID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("%s/%s/domains/%s", serviceType, serviceID, domainID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
-}
-
-func (c *SevallaClient) SetPrimaryDomain(ctx context.Context, serviceType string, serviceID string, domainID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("%s/%s/domains/%s/set-primary", serviceType, serviceID, domainID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
-}
-
-func (c *SevallaClient) ToggleDomain(ctx context.Context, serviceType string, serviceID string, domainID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("%s/%s/domains/%s/toggle", serviceType, serviceID, domainID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
-}
-
-func (c *SevallaClient) RefreshDomainStatus(ctx context.Context, serviceType string, serviceID string, domainID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("%s/%s/domains/%s/refresh-status", serviceType, serviceID, domainID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path(serviceType+"/%s/domains/%s", serviceID, domainID), nil, nil)
 }

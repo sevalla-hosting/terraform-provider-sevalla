@@ -35,6 +35,8 @@ type ApplicationResourceModel struct {
 	AllowDeployPaths           types.List   `tfsdk:"allow_deploy_paths"`
 	IgnoreDeployPaths          types.List   `tfsdk:"ignore_deploy_paths"`
 	Buildpacks                 types.List   `tfsdk:"buildpacks"`
+	CDNEnabled                 types.Bool   `tfsdk:"cdn_enabled"`
+	EdgeCacheEnabled           types.Bool   `tfsdk:"edge_cache_enabled"`
 	WaitForChecks              types.Bool   `tfsdk:"wait_for_checks"`
 	Name                       types.String `tfsdk:"name"`
 	Namespace                  types.String `tfsdk:"namespace"`
@@ -65,9 +67,7 @@ type ApplicationListDataSourceModel struct {
 	Applications []ApplicationListItemModel `tfsdk:"applications"`
 }
 
-// flattenApplication maps a client.Application to the Terraform resource model.
-// The model parameter is used to preserve values that are not returned by the API
-// (e.g., cluster_id, docker_registry_credential_id).
+// flattenApplication maps a client.Application (from GET) to the Terraform model.
 func flattenApplication(ctx context.Context, app *client.Application, model *ApplicationResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -80,7 +80,17 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 	model.BuildCacheEnabled = types.BoolValue(app.BuildCacheEnabled)
 	model.GitLFSEnabled = types.BoolValue(app.GitLFSEnabled)
 	model.HibernationEnabled = types.BoolValue(app.HibernationEnabled)
-	model.WaitForChecks = types.BoolValue(app.WaitForChecks)
+	// The API reports null while the status is temporarily unavailable; keep the known value then.
+	if app.IsCDNEnabled != nil || model.CDNEnabled.IsUnknown() {
+		model.CDNEnabled = optionalBool(app.IsCDNEnabled)
+	}
+	if app.IsEdgeCacheEnabled != nil || model.EdgeCacheEnabled.IsUnknown() {
+		model.EdgeCacheEnabled = optionalBool(app.IsEdgeCacheEnabled)
+	}
+	// wait_for_checks is deprecated and not part of the API; keep its configured value.
+	if model.WaitForChecks.IsUnknown() || model.WaitForChecks.IsNull() {
+		model.WaitForChecks = types.BoolValue(false)
+	}
 	model.IsSuspended = types.BoolValue(app.IsSuspended)
 	model.BuildType = types.StringValue(app.BuildType)
 	model.CreatedAt = types.StringValue(app.CreatedAt)
@@ -96,23 +106,21 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 	model.DefaultBranch = optionalString(app.DefaultBranch)
 	model.DockerImage = optionalString(app.DockerImage)
 
-	// Preserve cluster_id and docker_registry_credential_id from plan/state
-	// when the API does not return them (write-only / not echoed on GET).
 	if app.ClusterID != nil {
 		model.ClusterID = types.StringValue(*app.ClusterID)
 	}
-	if app.DockerRegistryCredentialID != nil {
-		model.DockerRegistryCredentialID = types.StringValue(*app.DockerRegistryCredentialID)
-	}
+	model.DockerRegistryCredentialID = optionalString(app.DockerRegistryCredentialID)
 	if app.BuildPath != nil {
 		model.BuildPath = types.StringValue(*app.BuildPath)
 	} else {
 		model.BuildPath = types.StringValue(".")
 	}
-	model.PackBuilder = optionalString(app.PackBuilder)
-	model.NixpacksVersion = optionalString(app.NixpacksVersion)
-	model.DockerfilePath = optionalString(app.DockerfilePath)
-	model.DockerContext = optionalString(app.DockerContext)
+	// The API keeps settings of other build types after build_type changes;
+	// they have no effect, so they are null in state (see nullUnlessBuildType).
+	model.PackBuilder = forBuildType(app, "pack", app.PackBuilder)
+	model.NixpacksVersion = forBuildType(app, "nixpacks", app.NixpacksVersion)
+	model.DockerfilePath = forBuildType(app, "dockerfile", app.DockerfilePath)
+	model.DockerContext = forBuildType(app, "dockerfile", app.DockerContext)
 	model.CreatedBy = optionalString(app.CreatedBy)
 
 	// Nullable int64 field
@@ -136,7 +144,7 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 		"order":  types.Int64Type,
 		"source": types.StringType,
 	}
-	if len(app.Buildpacks) > 0 {
+	if len(app.Buildpacks) > 0 && app.BuildType == "pack" {
 		bpObjects := make([]attr.Value, 0, len(app.Buildpacks))
 		for _, bp := range app.Buildpacks {
 			obj, d := types.ObjectValue(buildpackAttrTypes, map[string]attr.Value{
@@ -268,15 +276,11 @@ func buildUpdateRequest(ctx context.Context, plan *ApplicationResourceModel, sta
 		v := plan.DockerImage.ValueString()
 		req.DockerImage = &v
 	}
-	if !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
-		var paths []string
-		plan.AllowDeployPaths.ElementsAs(ctx, &paths, false)
-		req.AllowDeployPaths = paths
+	if !plan.AllowDeployPaths.IsUnknown() && !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
+		req.AllowDeployPaths = stringList(ctx, plan.AllowDeployPaths)
 	}
-	if !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
-		var paths []string
-		plan.IgnoreDeployPaths.ElementsAs(ctx, &paths, false)
-		req.IgnoreDeployPaths = paths
+	if !plan.IgnoreDeployPaths.IsUnknown() && !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
+		req.IgnoreDeployPaths = stringList(ctx, plan.IgnoreDeployPaths)
 	}
 	if !plan.Buildpacks.IsNull() && !plan.Buildpacks.IsUnknown() && !plan.Buildpacks.Equal(state.Buildpacks) {
 		var bpObjects []types.Object
@@ -346,6 +350,11 @@ func buildPostCreateUpdateRequest(ctx context.Context, plan *ApplicationResource
 		req.DockerContext = &v
 		hasFields = true
 	}
+	// POST only uses the credential for dockerImage sources; PATCH also applies it to Dockerfile builds.
+	if !plan.DockerRegistryCredentialID.IsNull() && !plan.DockerRegistryCredentialID.IsUnknown() {
+		req.DockerRegistryCredentialID = plan.DockerRegistryCredentialID.ValueStringPointer()
+		hasFields = true
+	}
 	if !plan.PackBuilder.IsNull() && !plan.PackBuilder.IsUnknown() {
 		v := plan.PackBuilder.ValueString()
 		req.PackBuilder = &v
@@ -387,6 +396,48 @@ func buildPostCreateUpdateRequest(ctx context.Context, plan *ApplicationResource
 		return nil
 	}
 	return req
+}
+
+// forBuildType returns v when the application uses buildType, and null otherwise.
+func forBuildType(app *client.Application, buildType string, v *string) types.String {
+	if app.BuildType != buildType {
+		return types.StringNull()
+	}
+	return optionalString(v)
+}
+
+// stringList returns the list's elements as a non-nil slice, so an empty list
+// is sent to the API as [] rather than omitted.
+func stringList(ctx context.Context, list types.List) []string {
+	out := []string{}
+	list.ElementsAs(ctx, &out, false)
+	return out
+}
+
+// keepOrder returns prior when it holds the same elements as got, so a
+// server-side reordering does not show up as a diff.
+func keepOrder[T comparable](prior, got []T) []T {
+	if len(prior) != len(got) {
+		return got
+	}
+	counts := make(map[T]int, len(got))
+	for _, v := range got {
+		counts[v]++
+	}
+	for _, v := range prior {
+		if counts[v] == 0 {
+			return got
+		}
+		counts[v]--
+	}
+	return prior
+}
+
+func optionalBool(b *bool) types.Bool {
+	if b == nil {
+		return types.BoolNull()
+	}
+	return types.BoolValue(*b)
 }
 
 // optionalString converts a *string to a types.String, returning null for nil pointers.

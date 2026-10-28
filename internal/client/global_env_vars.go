@@ -1,10 +1,7 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -37,78 +34,21 @@ func (c *SevallaClient) ListGlobalEnvVars(ctx context.Context) ([]GlobalEnvironm
 }
 
 func (c *SevallaClient) CreateGlobalEnvVar(ctx context.Context, input *CreateGlobalEnvVarRequest) (*GlobalEnvironmentVariable, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create global env var request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/applications/global-env-vars"), bytes.NewReader(body))
-	if err != nil {
+	var out GlobalEnvironmentVariable
+	if err := c.do(ctx, http.MethodPost, "/applications/global-env-vars", input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var envVar GlobalEnvironmentVariable
-	if err := json.NewDecoder(resp.Body).Decode(&envVar); err != nil {
-		return nil, fmt.Errorf("decoding global env var response: %w", err)
-	}
-
-	return &envVar, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) UpdateGlobalEnvVar(ctx context.Context, id string, input *UpdateGlobalEnvVarRequest) (*GlobalEnvironmentVariable, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update global env var request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.url("/applications/global-env-vars/%s", id), bytes.NewReader(body))
-	if err != nil {
+	var out GlobalEnvironmentVariable
+	if err := c.do(ctx, http.MethodPut, path("/applications/global-env-vars/%s", id), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var envVar GlobalEnvironmentVariable
-	if err := json.NewDecoder(resp.Body).Decode(&envVar); err != nil {
-		return nil, fmt.Errorf("decoding global env var response: %w", err)
-	}
-
-	return &envVar, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) DeleteGlobalEnvVar(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/applications/global-env-vars/%s", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/applications/global-env-vars/%s", id), nil, nil)
 }

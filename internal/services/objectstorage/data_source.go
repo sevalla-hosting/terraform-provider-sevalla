@@ -59,12 +59,12 @@ func (d *objectStorageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 				Computed:    true,
 			},
 			"access_key": schema.StringAttribute{
-				Description: "The access key for S3-compatible API authentication.",
+				Description: "Always null: the API only returns the access key when the bucket is created.",
 				Computed:    true,
 				Sensitive:   true,
 			},
 			"secret_key": schema.StringAttribute{
-				Description: "The secret key for S3-compatible API authentication.",
+				Description: "Always null: the API only returns the secret key when the bucket is created.",
 				Computed:    true,
 				Sensitive:   true,
 			},
@@ -82,6 +82,10 @@ func (d *objectStorageDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			},
 			"company_id": schema.StringAttribute{
 				Description: "The company ID that owns the object storage.",
+				Computed:    true,
+			},
+			"status": schema.StringAttribute{
+				Description: "The lifecycle status of the bucket: `active`, `deleting` or `deletionFailed`.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{

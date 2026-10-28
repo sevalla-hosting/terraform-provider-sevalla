@@ -1,8 +1,13 @@
 package client
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -58,10 +63,10 @@ func NewClient(apiKey string, opts ...Option) *SevallaClient {
 				if len(via) >= 10 {
 					return http.ErrUseLastResponse
 				}
-				// Strip Authorization header on cross-origin redirects
-				// to prevent leaking the API key.
+				// The transport sets Authorization on every request, so never
+				// follow a redirect to another host: it would leak the API key.
 				if len(via) > 0 && req.URL.Host != via[0].URL.Host {
-					req.Header.Del("Authorization")
+					return http.ErrUseLastResponse
 				}
 				// Prevent redirects away from the configured base URL scheme.
 				if req.URL.Scheme != "https" && baseURL == DefaultBaseURL {
@@ -75,9 +80,48 @@ func NewClient(apiKey string, opts ...Option) *SevallaClient {
 	return c
 }
 
-func (c *SevallaClient) url(path string, args ...interface{}) string {
-	if len(args) > 0 {
-		path = fmt.Sprintf(path, args...)
+// path formats an API path, escaping every argument as a single path segment.
+func path(format string, ids ...string) string {
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = url.PathEscape(id)
 	}
-	return c.BaseURL + path
+	return fmt.Sprintf(format, args...)
+}
+
+// do sends a JSON request to the API and decodes a JSON response into out.
+// A nil in sends no body; a nil out discards the response body. Any 2xx status
+// is a success.
+func (c *SevallaClient) do(ctx context.Context, method, path string, in, out any) error {
+	var body io.Reader
+	if in != nil {
+		b, err := json.Marshal(in)
+		if err != nil {
+			return fmt.Errorf("marshaling %s %s request: %w", method, path, err)
+		}
+		body = bytes.NewReader(b)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, body)
+	if err != nil {
+		return err
+	}
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return parseErrorResponse(resp)
+	}
+
+	if out == nil {
+		return nil
+	}
+	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+		return fmt.Errorf("decoding %s %s response: %w", method, path, err)
+	}
+	return nil
 }

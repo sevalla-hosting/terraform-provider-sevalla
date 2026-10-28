@@ -1,10 +1,7 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -16,13 +13,15 @@ type ObjectStorage struct {
 	DisplayName  string  `json:"display_name"`
 	Location     string  `json:"location"`
 	Jurisdiction string  `json:"jurisdiction"`
+	Status       string  `json:"status"`
 	Domain       *string `json:"domain"`
 	Endpoint     *string `json:"endpoint"`
-	AccessKey    *string `json:"access_key"`
-	SecretKey    *string `json:"secret_key"`
-	BucketName   string  `json:"bucket_name"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	// AccessKey and SecretKey are only returned by the create call.
+	AccessKey  *string `json:"access_key"`
+	SecretKey  *string `json:"secret_key"`
+	BucketName string  `json:"bucket_name"`
+	CreatedAt  string  `json:"created_at"`
+	UpdatedAt  string  `json:"updated_at"`
 }
 
 type CreateObjectStorageRequest struct {
@@ -34,17 +33,8 @@ type CreateObjectStorageRequest struct {
 }
 
 type UpdateObjectStorageRequest struct {
-	DisplayName *string `json:"display_name,omitempty"`
-	ProjectID   *string `json:"project_id,omitempty"`
-}
-
-type ObjectStorageListItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	DisplayName string  `json:"display_name"`
-	Status      *string `json:"status"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	DisplayName *string          `json:"display_name,omitempty"`
+	ProjectID   Nullable[string] `json:"project_id,omitzero"`
 }
 
 type CORSPolicy struct {
@@ -54,259 +44,70 @@ type CORSPolicy struct {
 	AllowedHeaders []string `json:"headers"`
 }
 
-type CreateCORSPolicyRequest struct {
+type CORSPolicyRequest struct {
 	AllowedOrigins []string `json:"origins"`
 	AllowedMethods []string `json:"methods"`
-	AllowedHeaders []string `json:"headers,omitempty"`
-}
-
-type UpdateCORSPolicyRequest struct {
-	AllowedOrigins []string `json:"origins,omitempty"`
-	AllowedMethods []string `json:"methods,omitempty"`
-	AllowedHeaders []string `json:"headers,omitempty"`
-}
-
-func (c *SevallaClient) ListObjectStorages(ctx context.Context) ([]ObjectStorageListItem, error) {
-	return Paginate[ObjectStorageListItem](ctx, c, "/object-storage")
+	// A non-nil empty slice is sent as [] to clear the headers.
+	AllowedHeaders []string `json:"headers,omitzero"`
 }
 
 func (c *SevallaClient) GetObjectStorage(ctx context.Context, id string) (*ObjectStorage, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/object-storage/%s", id), nil)
-	if err != nil {
+	var out ObjectStorage
+	if err := c.do(ctx, http.MethodGet, path("/object-storage/%s", id), nil, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var os ObjectStorage
-	if err := json.NewDecoder(resp.Body).Decode(&os); err != nil {
-		return nil, fmt.Errorf("decoding object storage response: %w", err)
-	}
-
-	return &os, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) CreateObjectStorage(ctx context.Context, input *CreateObjectStorageRequest) (*ObjectStorage, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create object storage request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/object-storage"), bytes.NewReader(body))
-	if err != nil {
+	var out ObjectStorage
+	if err := c.do(ctx, http.MethodPost, "/object-storage", input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var storage ObjectStorage
-	if err := json.NewDecoder(resp.Body).Decode(&storage); err != nil {
-		return nil, fmt.Errorf("decoding object storage response: %w", err)
-	}
-
-	return &storage, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) UpdateObjectStorage(ctx context.Context, id string, input *UpdateObjectStorageRequest) (*ObjectStorage, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update object storage request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.url("/object-storage/%s", id), bytes.NewReader(body))
-	if err != nil {
+	var out ObjectStorage
+	if err := c.do(ctx, http.MethodPatch, path("/object-storage/%s", id), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var storage ObjectStorage
-	if err := json.NewDecoder(resp.Body).Decode(&storage); err != nil {
-		return nil, fmt.Errorf("decoding object storage response: %w", err)
-	}
-
-	return &storage, nil
+	return &out, nil
 }
 
+// DeleteObjectStorage starts an asynchronous deletion (HTTP 202); the bucket
+// is emptied and removed in the background.
 func (c *SevallaClient) DeleteObjectStorage(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/object-storage/%s", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/object-storage/%s", id), nil, nil)
 }
 
+// EnableObjectStorageCDN turns on the public CDN domain.
 func (c *SevallaClient) EnableObjectStorageCDN(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/object-storage/%s/domain", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodPost, path("/object-storage/%s/domain", id), nil, nil)
 }
 
+// DisableObjectStorageCDN turns off the public CDN domain.
 func (c *SevallaClient) DisableObjectStorageCDN(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/object-storage/%s/domain", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/object-storage/%s/domain", id), nil, nil)
 }
 
 func (c *SevallaClient) ListCORSPolicies(ctx context.Context, osID string) ([]CORSPolicy, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/object-storage/%s/cors-policies", osID), nil)
-	if err != nil {
-		return nil, err
+	var out struct {
+		Data []CORSPolicy `json:"data"`
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var raw json.RawMessage
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("decoding cors policies response: %w", err)
-	}
-
-	var policies []CORSPolicy
-	if err := json.Unmarshal(raw, &policies); err != nil {
-		var wrapper struct {
-			Data []CORSPolicy `json:"data"`
-		}
-		if err2 := json.Unmarshal(raw, &wrapper); err2 != nil {
-			return nil, fmt.Errorf("decoding cors policies response: %w", err)
-		}
-		policies = wrapper.Data
-	}
-
-	return policies, nil
+	err := c.do(ctx, http.MethodGet, path("/object-storage/%s/cors-policies", osID), nil, &out)
+	return out.Data, err
 }
 
-func (c *SevallaClient) CreateCORSPolicy(ctx context.Context, osID string, input *CreateCORSPolicyRequest) error {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return fmt.Errorf("marshaling create cors policy request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/object-storage/%s/cors-policies", osID), bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+// CreateCORSPolicy returns no body; list the policies to find the new one.
+func (c *SevallaClient) CreateCORSPolicy(ctx context.Context, osID string, input *CORSPolicyRequest) error {
+	return c.do(ctx, http.MethodPost, path("/object-storage/%s/cors-policies", osID), input, nil)
 }
 
-func (c *SevallaClient) UpdateCORSPolicy(ctx context.Context, osID string, policyID string, input *UpdateCORSPolicyRequest) error {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return fmt.Errorf("marshaling update cors policy request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.url("/object-storage/%s/cors-policies/%s", osID, policyID), bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+func (c *SevallaClient) UpdateCORSPolicy(ctx context.Context, osID string, policyID string, input *CORSPolicyRequest) error {
+	return c.do(ctx, http.MethodPatch, path("/object-storage/%s/cors-policies/%s", osID, policyID), input, nil)
 }
 
 func (c *SevallaClient) DeleteCORSPolicy(ctx context.Context, osID string, policyID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/object-storage/%s/cors-policies/%s", osID, policyID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/object-storage/%s/cors-policies/%s", osID, policyID), nil, nil)
 }

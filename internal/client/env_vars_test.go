@@ -17,9 +17,12 @@ func TestListEnvironmentVariables_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]EnvironmentVariable{
-			{ID: "env-1", Key: "DATABASE_URL", Value: "postgres://localhost/mydb"},
-			{ID: "env-2", Key: "API_KEY", Value: "secret-key-123"},
+		json.NewEncoder(w).Encode(PaginatedResponse[EnvironmentVariable]{
+			Data: []EnvironmentVariable{
+				{ID: "env-1", Key: "DATABASE_URL", Value: "postgres://localhost/mydb"},
+				{ID: "env-2", Key: "API_KEY", Value: "secret-key-123"},
+			},
+			Total: 2,
 		})
 	})
 	defer server.Close()

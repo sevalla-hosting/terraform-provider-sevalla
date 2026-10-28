@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -33,6 +36,7 @@ type StaticSiteDomainResourceModel struct {
 	IsWildcard    types.Bool   `tfsdk:"is_wildcard"`
 	IsEnabled     types.Bool   `tfsdk:"is_enabled"`
 	Status        types.String `tfsdk:"status"`
+	DNSRecords    types.String `tfsdk:"dns_records"`
 	CustomSSLCert types.String `tfsdk:"custom_ssl_cert"`
 	CustomSSLKey  types.String `tfsdk:"custom_ssl_key"`
 	CreatedAt     types.String `tfsdk:"created_at"`
@@ -68,12 +72,13 @@ func (r *staticSiteDomainResource) Schema(_ context.Context, _ resource.SchemaRe
 			"name": schema.StringAttribute{
 				Description: "The domain name.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The domain type (custom or system).",
+				Description: "The domain type: `CUSTOM` for user-added domains or `SYSTEM` for platform-assigned ones.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -84,22 +89,28 @@ func (r *staticSiteDomainResource) Schema(_ context.Context, _ resource.SchemaRe
 				Computed:    true,
 			},
 			"is_wildcard": schema.BoolAttribute{
-				Description: "Whether this should be a wildcard domain that matches all subdomains.",
+				Description: "Whether the domain is a wildcard domain that matches all subdomains. Defaults to `false`. Changing this creates a new domain.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+					boolplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"custom_ssl_cert": schema.StringAttribute{
-				Description: "Custom SSL certificate in PEM format. When provided, the platform uses this certificate instead of auto-provisioning one.",
+				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing this creates a new domain.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_key"))},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"custom_ssl_key": schema.StringAttribute{
-				Description: "Private key for the custom SSL certificate in PEM format. Required when custom_ssl_cert is provided.",
+				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing this creates a new domain.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_cert"))},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -109,7 +120,11 @@ func (r *staticSiteDomainResource) Schema(_ context.Context, _ resource.SchemaRe
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "The status of the domain.",
+				Description: "The verification status: `VERIFICATION`, `POINTING`, `ACTIVE` or `TIMED_OUT`.",
+				Computed:    true,
+			},
+			"dns_records": schema.StringAttribute{
+				Description: "JSON-encoded DNS records to create for the domain (e.g. `[{\"type\":\"CNAME\",\"name\":\"app.example.com\",\"value\":\"...\"}]`), or null when none are needed. Decode it with `jsondecode()`.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -214,7 +229,7 @@ func (r *staticSiteDomainResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	err := r.client.DeleteDomain(ctx, "/static-sites", state.StaticSiteID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Static Site Domain", err.Error())
 		return
 	}
@@ -236,7 +251,10 @@ func (r *staticSiteDomainResource) ImportState(ctx context.Context, req resource
 
 func flattenStaticSiteDomain(domain *client.Domain, model *StaticSiteDomainResourceModel) {
 	model.ID = types.StringValue(domain.ID)
-	model.Name = types.StringValue(domain.Name)
+	// Keep the configured spelling when the API only changes the case.
+	if !strings.EqualFold(model.Name.ValueString(), domain.Name) {
+		model.Name = types.StringValue(domain.Name)
+	}
 	model.Type = types.StringValue(domain.Type)
 	model.IsPrimary = types.BoolValue(domain.IsPrimary)
 	model.IsWildcard = types.BoolValue(domain.IsWildcard)
@@ -248,4 +266,8 @@ func flattenStaticSiteDomain(domain *client.Domain, model *StaticSiteDomainResou
 	}
 	model.CreatedAt = types.StringValue(domain.CreatedAt)
 	model.UpdatedAt = types.StringValue(domain.UpdatedAt)
+	model.DNSRecords = types.StringNull()
+	if domain.DnsRecords != nil && string(*domain.DnsRecords) != "null" {
+		model.DNSRecords = types.StringValue(string(*domain.DnsRecords))
+	}
 }

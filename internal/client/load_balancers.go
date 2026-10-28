@@ -1,10 +1,7 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 )
 
@@ -14,7 +11,7 @@ type LoadBalancer struct {
 	ProjectID   *string `json:"project_id"`
 	Name        string  `json:"name"`
 	DisplayName string  `json:"display_name"`
-	Type        *string `json:"type,omitempty"`
+	Type        string  `json:"type"`
 	CreatedAt   string  `json:"created_at"`
 	UpdatedAt   string  `json:"updated_at"`
 }
@@ -26,18 +23,9 @@ type CreateLoadBalancerRequest struct {
 }
 
 type UpdateLoadBalancerRequest struct {
-	DisplayName *string `json:"display_name,omitempty"`
-	Type        *string `json:"type,omitempty"`
-	ProjectID   *string `json:"project_id,omitempty"`
-}
-
-type LoadBalancerListItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	DisplayName string  `json:"display_name"`
-	Type        *string `json:"type,omitempty"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	DisplayName *string          `json:"display_name,omitempty"`
+	Type        *string          `json:"type,omitempty"`
+	ProjectID   Nullable[string] `json:"project_id,omitzero"`
 }
 
 type LoadBalancerDestination struct {
@@ -62,178 +50,54 @@ type CreateLoadBalancerDestinationRequest struct {
 	Longitude   *float64 `json:"longitude,omitempty"`
 }
 
-func (c *SevallaClient) ListLoadBalancers(ctx context.Context) ([]LoadBalancerListItem, error) {
-	return Paginate[LoadBalancerListItem](ctx, c, "/load-balancers")
+func (c *SevallaClient) ListLoadBalancers(ctx context.Context) ([]LoadBalancer, error) {
+	return Paginate[LoadBalancer](ctx, c, "/load-balancers")
 }
 
 func (c *SevallaClient) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/load-balancers/%s", id), nil)
-	if err != nil {
+	var out LoadBalancer
+	if err := c.do(ctx, http.MethodGet, path("/load-balancers/%s", id), nil, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var lb LoadBalancer
-	if err := json.NewDecoder(resp.Body).Decode(&lb); err != nil {
-		return nil, fmt.Errorf("decoding load balancer response: %w", err)
-	}
-
-	return &lb, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) CreateLoadBalancer(ctx context.Context, input *CreateLoadBalancerRequest) (*LoadBalancer, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create load balancer request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/load-balancers"), bytes.NewReader(body))
-	if err != nil {
+	var out LoadBalancer
+	if err := c.do(ctx, http.MethodPost, "/load-balancers", input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var lb LoadBalancer
-	if err := json.NewDecoder(resp.Body).Decode(&lb); err != nil {
-		return nil, fmt.Errorf("decoding load balancer response: %w", err)
-	}
-
-	return &lb, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) UpdateLoadBalancer(ctx context.Context, id string, input *UpdateLoadBalancerRequest) (*LoadBalancer, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update load balancer request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.url("/load-balancers/%s", id), bytes.NewReader(body))
-	if err != nil {
+	var out LoadBalancer
+	if err := c.do(ctx, http.MethodPatch, path("/load-balancers/%s", id), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var lb LoadBalancer
-	if err := json.NewDecoder(resp.Body).Decode(&lb); err != nil {
-		return nil, fmt.Errorf("decoding load balancer response: %w", err)
-	}
-
-	return &lb, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) DeleteLoadBalancer(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/load-balancers/%s", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/load-balancers/%s", id), nil, nil)
 }
 
 func (c *SevallaClient) ListLoadBalancerDestinations(ctx context.Context, lbID string) ([]LoadBalancerDestination, error) {
-	return Paginate[LoadBalancerDestination](ctx, c, fmt.Sprintf("/load-balancers/%s/destinations", lbID))
+	return Paginate[LoadBalancerDestination](ctx, c, path("/load-balancers/%s/destinations", lbID))
 }
 
 func (c *SevallaClient) CreateLoadBalancerDestination(ctx context.Context, lbID string, input *CreateLoadBalancerDestinationRequest) (*LoadBalancerDestination, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create load balancer destination request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/load-balancers/%s/destinations", lbID), bytes.NewReader(body))
-	if err != nil {
+	var out LoadBalancerDestination
+	if err := c.do(ctx, http.MethodPost, path("/load-balancers/%s/destinations", lbID), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var dest LoadBalancerDestination
-	if err := json.NewDecoder(resp.Body).Decode(&dest); err != nil {
-		return nil, fmt.Errorf("decoding load balancer destination response: %w", err)
-	}
-
-	return &dest, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) DeleteLoadBalancerDestination(ctx context.Context, lbID string, destID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/load-balancers/%s/destinations/%s", lbID, destID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/load-balancers/%s/destinations/%s", lbID, destID), nil, nil)
 }
 
 func (c *SevallaClient) ToggleLoadBalancerDestination(ctx context.Context, lbID string, destID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/load-balancers/%s/destinations/%s/toggle", lbID, destID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodPost, path("/load-balancers/%s/destinations/%s/toggle", lbID, destID), nil, nil)
 }

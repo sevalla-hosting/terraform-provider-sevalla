@@ -3,12 +3,17 @@ package objectstorage
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -42,32 +47,45 @@ func (r *objectStorageResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "The display name of the object storage.",
+				Description: "The display name of the object storage (2-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 64)},
 			},
 			"location": schema.StringAttribute{
-				Description: "Geographic hint for where most data access occurs. Valid values: apac, eeur, enam, oc, weur, wnam. Defaults to enam.",
+				Description: "Geographic hint for where most data access occurs. Valid values: `apac`, `eeur`, `enam`, `oc`, `weur`, `wnam`. Defaults to `enam`. Changing this creates a new bucket.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("apac", "eeur", "enam", "oc", "weur", "wnam")},
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"jurisdiction": schema.StringAttribute{
-				Description: "Data residency jurisdiction. Valid values: default, eu, fedramp. Defaults to default.",
+				Description: "Data residency jurisdiction. Valid values: `default`, `eu`, `fedramp`. Defaults to `default`. Changing this creates a new bucket.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("default", "eu", "fedramp")},
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"public_access": schema.BoolAttribute{
-				Description: "Whether to enable a public CDN domain for this bucket. Defaults to false.",
+				Description: "Whether the bucket has a public CDN domain. Defaults to `false`.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The project to group this bucket under.",
+				Description: "The ID of the project to group the bucket under. Removing it removes the bucket from the project.",
 				Optional:    true,
+			},
+			"status": schema.StringAttribute{
+				Description: "The lifecycle status of the bucket: `active`, `deleting` or `deletionFailed`.",
+				Computed:    true,
 			},
 			// Computed-only attributes
 			"name": schema.StringAttribute{
@@ -84,16 +102,25 @@ func (r *objectStorageResource) Schema(_ context.Context, _ resource.SchemaReque
 			"endpoint": schema.StringAttribute{
 				Description: "The S3-compatible API endpoint URL for the object storage.",
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"access_key": schema.StringAttribute{
-				Description: "The access key for S3-compatible API authentication. Only returned on create.",
+				Description: "The access key ID for the S3-compatible API. The API only returns it when the bucket is created, so it is null after an import.",
 				Computed:    true,
 				Sensitive:   true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"secret_key": schema.StringAttribute{
-				Description: "The secret key for S3-compatible API authentication. Only returned on create.",
+				Description: "The secret access key for the S3-compatible API. The API only returns it when the bucket is created, so it is null after an import.",
 				Computed:    true,
 				Sensitive:   true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"bucket_name": schema.StringAttribute{
 				Description: "The bucket name.",
@@ -206,15 +233,28 @@ func (r *objectStorageResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
-	updateReq := buildUpdateRequest(&plan, &state)
+	id := state.ID.ValueString()
+	if updateReq := buildUpdateRequest(&plan, &state); !reflect.ValueOf(*updateReq).IsZero() {
+		if _, err := r.client.UpdateObjectStorage(ctx, id, updateReq); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Object Storage",
+				"Could not update object storage ID "+id+": "+err.Error(),
+			)
+			return
+		}
+	}
 
-	_, err := r.client.UpdateObjectStorage(ctx, state.ID.ValueString(), updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating Object Storage",
-			"Could not update object storage ID "+state.ID.ValueString()+": "+err.Error(),
-		)
-		return
+	if !plan.PublicAccess.IsUnknown() && !plan.PublicAccess.Equal(state.PublicAccess) {
+		var err error
+		if plan.PublicAccess.ValueBool() {
+			err = r.client.EnableObjectStorageCDN(ctx, id)
+		} else {
+			err = r.client.DisableObjectStorageCDN(ctx, id)
+		}
+		if err != nil {
+			resp.Diagnostics.AddError("Error Updating Object Storage", "Could not change public access of object storage ID "+id+": "+err.Error())
+			return
+		}
 	}
 
 	// PATCH response omits bucket_name, endpoint, access_key, secret_key.
@@ -243,15 +283,37 @@ func (r *objectStorageResource) Delete(ctx context.Context, req resource.DeleteR
 		return
 	}
 
-	err := r.client.DeleteObjectStorage(ctx, state.ID.ValueString())
+	id := state.ID.ValueString()
+	err := r.client.DeleteObjectStorage(ctx, id)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Deleting Object Storage",
-			"Could not delete object storage ID "+state.ID.ValueString()+": "+err.Error(),
+			"Could not delete object storage ID "+id+": "+err.Error(),
 		)
 		return
 	}
+
+	// Deletion empties and removes the bucket in the background.
+	err = client.Poll(ctx, deleteTimeout, func() (bool, error) {
+		os, err := r.client.GetObjectStorage(ctx, id)
+		if client.IsNotFound(err) {
+			return true, nil
+		}
+		if err == nil && os.Status == "deletionFailed" {
+			err = fmt.Errorf("deletion of object storage ID %s failed", id)
+		}
+		return false, err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Waiting for Object Storage Deletion", err.Error())
+	}
 }
+
+// deleteTimeout bounds how long Delete waits for the bucket to be removed.
+const deleteTimeout = 30 * time.Minute
 
 func (r *objectStorageResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)

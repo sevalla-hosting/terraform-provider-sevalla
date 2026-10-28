@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -42,13 +44,20 @@ func (r *dockerRegistryResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the Docker registry credential.",
+				Description: "The name of the Docker registry credential (1-255 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 			},
 			"registry": schema.StringAttribute{
-				Description: "The Docker registry type (e.g., gcr, ecr, dockerHub, github, gitlab, digitalOcean, custom).",
+				Description: "The Docker registry provider: `dockerHub` (default), `gcr`, `ecr`, `github`, `gitlab`, `digitalOcean` or `custom`.",
 				Optional:    true,
 				Computed:    true,
+				Validators: []validator.String{
+					stringvalidator.OneOf("gcr", "ecr", "dockerHub", "github", "gitlab", "digitalOcean", "custom"),
+				},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"username": schema.StringAttribute{
 				Description: "The username for the Docker registry.",
@@ -191,7 +200,7 @@ func (r *dockerRegistryResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	err := r.client.DeleteDockerRegistry(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Docker Registry",
 			"Could not delete Docker registry ID "+state.ID.ValueString()+": "+err.Error(),

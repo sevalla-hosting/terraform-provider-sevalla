@@ -26,6 +26,8 @@ type LoadBalancerListItemModel struct {
 	Name        types.String `tfsdk:"name"`
 	DisplayName types.String `tfsdk:"display_name"`
 	Type        types.String `tfsdk:"type"`
+	ProjectID   types.String `tfsdk:"project_id"`
+	CompanyID   types.String `tfsdk:"company_id"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -48,7 +50,7 @@ func flattenLoadBalancer(_ context.Context, lb *client.LoadBalancer, model *Load
 	// Nullable string fields
 	model.CompanyID = optionalString(lb.CompanyID)
 	model.ProjectID = optionalString(lb.ProjectID)
-	model.Type = optionalString(lb.Type)
+	model.Type = types.StringValue(lb.Type)
 
 	return diags
 }
@@ -84,9 +86,9 @@ func buildUpdateRequest(plan *LoadBalancerResourceModel, state *LoadBalancerReso
 		v := plan.Type.ValueString()
 		req.Type = &v
 	}
-	if !plan.ProjectID.IsNull() && !plan.ProjectID.IsUnknown() && !plan.ProjectID.Equal(state.ProjectID) {
-		v := plan.ProjectID.ValueString()
-		req.ProjectID = &v
+	if !plan.ProjectID.IsUnknown() && !plan.ProjectID.Equal(state.ProjectID) {
+		// A null plan value is sent as JSON null to remove the project assignment.
+		req.ProjectID = client.NullableOf(plan.ProjectID.ValueStringPointer())
 	}
 
 	return req

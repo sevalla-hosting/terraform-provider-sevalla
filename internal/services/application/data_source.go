@@ -141,9 +141,18 @@ func (d *applicationDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 					},
 				},
 			},
-			"wait_for_checks": schema.BoolAttribute{
-				Description: "Whether to wait for checks before deploying.",
+			"cdn_enabled": schema.BoolAttribute{
+				Description: "Whether the CDN is enabled for the application.",
 				Computed:    true,
+			},
+			"edge_cache_enabled": schema.BoolAttribute{
+				Description: "Whether edge caching is enabled for the application.",
+				Computed:    true,
+			},
+			"wait_for_checks": schema.BoolAttribute{
+				Description:        "Always null.",
+				DeprecationMessage: "The Sevalla API does not support wait_for_checks. This attribute is always null and will be removed in a future major version.",
+				Computed:           true,
 			},
 			"name": schema.StringAttribute{
 				Description: "The system-generated name of the application.",
@@ -222,6 +231,7 @@ func (d *applicationDataSource) Read(ctx context.Context, req datasource.ReadReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	model.WaitForChecks = types.BoolNull()
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }

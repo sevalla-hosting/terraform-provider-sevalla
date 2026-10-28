@@ -3,14 +3,17 @@ package application
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -63,29 +66,30 @@ func (r *applicationEnvVarResource) Schema(_ context.Context, _ resource.SchemaR
 				},
 			},
 			"key": schema.StringAttribute{
-				Description: "The environment variable key.",
+				Description: "The environment variable key. Must be unique within the application and contain only letters, digits, `-`, `_`, `.` or `:`.",
 				Required:    true,
+				Validators: []validator.String{
+					stringvalidator.LengthBetween(1, 255),
+					stringvalidator.RegexMatches(envVarKeyPattern, "must contain only letters, digits, -, _, . or :"),
+				},
 			},
 			"value": schema.StringAttribute{
-				Description: "The environment variable value.",
+				Description: "The environment variable value (at most 32768 characters).",
 				Required:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.LengthAtMost(32768)},
 			},
 			"is_runtime": schema.BoolAttribute{
-				Description: "Whether the environment variable is available at runtime.",
+				Description: "Whether the environment variable is available at runtime. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
+				Default:     booldefault.StaticBool(true),
 			},
 			"is_buildtime": schema.BoolAttribute{
-				Description: "Whether the environment variable is available at build time.",
+				Description: "Whether the environment variable is available at build time. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
-				PlanModifiers: []planmodifier.Bool{
-					boolplanmodifier.UseStateForUnknown(),
-				},
+				Default:     booldefault.StaticBool(true),
 			},
 			"created_at": schema.StringAttribute{
 				Description: "The timestamp when the environment variable was created.",
@@ -235,7 +239,7 @@ func (r *applicationEnvVarResource) Delete(ctx context.Context, req resource.Del
 	}
 
 	err := r.client.DeleteEnvironmentVariable(ctx, "/applications", state.ApplicationID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Application Environment Variable", err.Error())
 		return
 	}
@@ -255,21 +259,16 @@ func (r *applicationEnvVarResource) ImportState(ctx context.Context, req resourc
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
+var envVarKeyPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]+$`)
+
 func flattenEnvVar(envVar *client.EnvironmentVariable, model *ApplicationEnvVarResourceModel) {
 	model.ID = types.StringValue(envVar.ID)
 	model.Key = types.StringValue(envVar.Key)
 	model.Value = types.StringValue(envVar.Value)
 
-	if envVar.IsRuntime != nil {
-		model.IsRuntime = types.BoolValue(*envVar.IsRuntime)
-	} else {
-		model.IsRuntime = types.BoolNull()
-	}
-	if envVar.IsBuildtime != nil {
-		model.IsBuildtime = types.BoolValue(*envVar.IsBuildtime)
-	} else {
-		model.IsBuildtime = types.BoolNull()
-	}
+	// A null flag means the API default, which is true.
+	model.IsRuntime = types.BoolValue(envVar.IsRuntime == nil || *envVar.IsRuntime)
+	model.IsBuildtime = types.BoolValue(envVar.IsBuildtime == nil || *envVar.IsBuildtime)
 	model.CreatedAt = optionalString(envVar.CreatedAt)
 	model.UpdatedAt = optionalString(envVar.UpdatedAt)
 }

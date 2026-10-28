@@ -16,16 +16,11 @@ func TestGetAPIKey_Success(t *testing.T) {
 			t.Errorf("unexpected method: %s", r.Method)
 		}
 
-		token := "sevalla_abc123def456"
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(APIKey{
-			ID:        "key-123",
-			Name:      "My API Key",
-			Token:     &token,
-			Enabled:   true,
-			CreatedAt: "2025-01-01T00:00:00.000Z",
-			UpdatedAt: "2025-01-01T00:00:00.000Z",
-		})
+		_, _ = w.Write([]byte(`{"id":"key-123","name":"My API Key","is_enabled":true,"masked_token":"sevall...f456",
+			"roles":[{"id":"role-1","name":"Admin","description":"Full access"}],
+			"capabilities":[{"id":"cap-1","permission":"APP:READ","resource_id":"app-1"}],
+			"created_at":"2025-01-01T00:00:00.000Z","updated_at":"2025-01-01T00:00:00.000Z"}`))
 	})
 	defer server.Close()
 
@@ -42,8 +37,11 @@ func TestGetAPIKey_Success(t *testing.T) {
 	if !apiKey.Enabled {
 		t.Error("expected Enabled to be true")
 	}
-	if apiKey.Token == nil || *apiKey.Token != "sevalla_abc123def456" {
-		t.Errorf("expected token %q", "sevalla_abc123def456")
+	if len(apiKey.Roles) != 1 || apiKey.Roles[0].ID != "role-1" {
+		t.Errorf("unexpected roles: %+v", apiKey.Roles)
+	}
+	if len(apiKey.Capabilities) != 1 || apiKey.Capabilities[0].ResourceID == nil || *apiKey.Capabilities[0].ResourceID != "app-1" {
+		t.Errorf("unexpected capabilities: %+v", apiKey.Capabilities)
 	}
 }
 
@@ -83,17 +81,12 @@ func TestCreateAPIKey_Success(t *testing.T) {
 			t.Errorf("expected name %q, got %q", "Terraform Key", req.Name)
 		}
 
-		token := "sevalla_new_token"
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(APIKey{
-			ID:        "key-new",
-			Name:      req.Name,
-			Token:     &token,
-			Enabled:   true,
-			ExpiresAt: req.ExpiresAt,
-			CreatedAt: "2025-01-01T00:00:00.000Z",
-			UpdatedAt: "2025-01-01T00:00:00.000Z",
+		json.NewEncoder(w).Encode(CreatedAPIKey{
+			ID:    "key-new",
+			Name:  req.Name,
+			Token: "sevalla_new_token",
 		})
 	})
 	defer server.Close()
@@ -110,7 +103,7 @@ func TestCreateAPIKey_Success(t *testing.T) {
 	if apiKey.Name != "Terraform Key" {
 		t.Errorf("expected name %q, got %q", "Terraform Key", apiKey.Name)
 	}
-	if apiKey.Token == nil || *apiKey.Token != "sevalla_new_token" {
+	if apiKey.Token != "sevalla_new_token" {
 		t.Errorf("expected token %q", "sevalla_new_token")
 	}
 }

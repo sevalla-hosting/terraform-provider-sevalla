@@ -48,6 +48,10 @@ func (d *apiKeyDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				Computed:    true,
 				Sensitive:   true,
 			},
+			"masked_token": schema.StringAttribute{
+				Description: "The token with all but its first 6 and last 4 characters masked.",
+				Computed:    true,
+			},
 			"enabled": schema.BoolAttribute{
 				Description: "Whether the API key is enabled.",
 				Computed:    true,
@@ -98,7 +102,7 @@ func (d *apiKeyDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				},
 			},
 			"source": schema.StringAttribute{
-				Description: "How the API key was created (DASHBOARD, CLI, EXTERNAL).",
+				Description: "How the API key was created: `DASHBOARD`, `CLI`, `EXTERNAL`, `MCP` or `SUPPORT_MCP`.",
 				Computed:    true,
 			},
 			"last_used_at": schema.StringAttribute{
@@ -150,7 +154,7 @@ func (d *apiKeyDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	flattenAPIKey(apiKey, &model)
+	resp.Diagnostics.Append(flattenAPIKey(ctx, apiKey, &model)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }
