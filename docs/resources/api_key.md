@@ -13,17 +13,23 @@ Manages a Sevalla API key.
 ## Example Usage
 
 ```terraform
-# Full-access API key
-resource "sevalla_api_key" "example" {
+data "sevalla_api_key_roles" "all" {}
+
+# API key with a predefined role
+resource "sevalla_api_key" "ci" {
   name       = "ci-cd-key"
   expires_at = "2027-01-01T00:00:00Z"
+  role_ids   = [data.sevalla_api_key_roles.all.roles[0].id]
 }
 
-# Scoped API key with specific capabilities
-resource "sevalla_api_key" "readonly" {
-  name         = "monitoring-key"
-  expires_at   = "2027-06-01T00:00:00Z"
-  capabilities = ["APP:READ", "DATABASE:READ"]
+# Read-only API key scoped with capabilities
+resource "sevalla_api_key" "monitoring" {
+  name = "monitoring-key"
+
+  capabilities = [
+    { permission = "APP:READ" },
+    { permission = "DATABASE:READ" },
+  ]
 }
 ```
 
@@ -32,20 +38,44 @@ resource "sevalla_api_key" "readonly" {
 
 ### Required
 
-- `name` (String) The name of the API key.
+- `name` (String) The name of the API key (1-255 characters).
 
 ### Optional
 
-- `capabilities` (List of String) List of permission strings to assign to the API key (e.g., APP:READ, DATABASE:CREATE).
-- `expires_at` (String) The expiration date of the API key.
+- `capabilities` (Attributes List) Capabilities (permissions) to grant to the API key. At least one of `capabilities` or `role_ids` is required. (see [below for nested schema](#nestedatt--capabilities))
+- `enabled` (Boolean) Whether the API key can be used to authenticate. Defaults to `true`.
+- `expires_at` (String) When the API key expires, as an RFC 3339 timestamp (e.g. `2027-01-01T00:00:00Z`). Omit for a key that never expires. Changing this creates a new API key.
+- `role_ids` (List of String) IDs of the roles to assign to the API key. Use the `sevalla_api_key_roles` data source to discover available roles. At least one of `capabilities` or `role_ids` is required.
 
 ### Read-Only
 
 - `company_id` (String) The company ID that owns the API key.
 - `created_at` (String) The timestamp when the API key was created.
-- `enabled` (Boolean) Whether the API key is enabled.
 - `id` (String) The unique identifier of the API key.
 - `last_used_at` (String) The timestamp when the API key was last used for authentication.
-- `source` (String) How the API key was created (DASHBOARD, CLI, EXTERNAL).
+- `masked_token` (String) The token with all but its first 6 and last 4 characters masked.
+- `roles` (Attributes List) The roles assigned to this API key. (see [below for nested schema](#nestedatt--roles))
+- `source` (String) How the API key was created: `DASHBOARD`, `CLI`, `EXTERNAL`, `MCP` or `SUPPORT_MCP`.
 - `token` (String, Sensitive) The API key token. Only returned on create.
 - `updated_at` (String) The timestamp when the API key was last updated.
+
+<a id="nestedatt--capabilities"></a>
+### Nested Schema for `capabilities`
+
+Required:
+
+- `permission` (String) The permission in `RESOURCE:ACTION` format (e.g. `APP:READ`, `DATABASE:CREATE`). Use the `sevalla_api_key_permissions` data source to list them.
+
+Optional:
+
+- `id_resource` (String) Optional resource ID to scope this permission to a specific resource.
+
+
+<a id="nestedatt--roles"></a>
+### Nested Schema for `roles`
+
+Read-Only:
+
+- `description` (String) The description of the role.
+- `id` (String) The unique identifier of the role.
+- `name` (String) The name of the role.

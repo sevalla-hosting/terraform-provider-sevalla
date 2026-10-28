@@ -17,8 +17,8 @@ data "sevalla_load_balancer" "example" {
   id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 }
 
-output "lb_status" {
-  value = data.sevalla_load_balancer.example.status
+output "lb_type" {
+  value = data.sevalla_load_balancer.example.type
 }
 ```
 
@@ -31,14 +31,10 @@ output "lb_status" {
 
 ### Read-Only
 
-- `algorithm` (String) The load balancing algorithm.
-- `cluster_id` (String) The cluster where the load balancer is deployed.
 - `company_id` (String) The company ID that owns the load balancer.
 - `created_at` (String) When the load balancer was created.
 - `display_name` (String) The display name of the load balancer.
 - `name` (String) The system-generated name of the load balancer.
-- `port` (Number) The port the load balancer listens on.
 - `project_id` (String) The project ID associated with this load balancer.
-- `protocol` (String) The protocol for the load balancer.
-- `status` (String) The current status of the load balancer.
+- `type` (String) The routing type. Valid values: DEFAULT, GEO.
 - `updated_at` (String) When the load balancer was last updated.

@@ -16,7 +16,7 @@ Manages a Sevalla webhook.
 resource "sevalla_webhook" "example" {
   endpoint       = "https://hooks.example.com/sevalla"
   description    = "Notify on deployments"
-  allowed_events = ["deployment.started", "deployment.completed", "deployment.failed"]
+  allowed_events = ["APP_DEPLOY", "STATIC_SITE_DEPLOY"]
 }
 ```
 
@@ -25,12 +25,13 @@ resource "sevalla_webhook" "example" {
 
 ### Required
 
-- `allowed_events` (List of String) The list of events that trigger the webhook.
-- `endpoint` (String) The endpoint URI to send webhook events to.
+- `allowed_events` (List of String) The events the webhook subscribes to. Valid values: `APP_CREATE`, `APP_UPDATE`, `APP_DELETE`, `APP_DEPLOY`, `DATABASE_CREATE`, `DATABASE_UPDATE`, `DATABASE_DELETE`, `STATIC_SITE_CREATE`, `STATIC_SITE_UPDATE`, `STATIC_SITE_DELETE`, `STATIC_SITE_DEPLOY`.
+- `endpoint` (String) The URL that webhook events are delivered to via HTTP POST.
 
 ### Optional
 
-- `description` (String) An optional description for the webhook.
+- `description` (String) A description for the webhook (at most 255 characters).
+- `is_enabled` (Boolean) Whether the webhook delivers events. Defaults to `true`.
 
 ### Read-Only
 
@@ -38,7 +39,8 @@ resource "sevalla_webhook" "example" {
 - `created_at` (String) The timestamp when the webhook was created.
 - `created_by` (String) The identifier of the API key that created the webhook.
 - `id` (String) The unique identifier of the webhook.
-- `is_enabled` (Boolean) Whether the webhook is enabled.
+- `old_secret` (String, Sensitive) The previous webhook signing secret after a secret rotation.
+- `old_secret_expired_at` (String) The expiration timestamp of the old secret.
 - `secret` (String, Sensitive) The webhook signing secret.
 - `updated_at` (String) The timestamp when the webhook was last updated.
 - `updated_by` (String) The identifier of the API key that last updated the webhook.

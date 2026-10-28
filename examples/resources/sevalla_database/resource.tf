@@ -9,7 +9,7 @@ resource "sevalla_database" "postgres" {
   db_user          = "myapp_user"
   db_password      = var.db_password
 
-  extensions {
+  extensions = {
     enable_postgis = true
     enable_vector  = true
   }

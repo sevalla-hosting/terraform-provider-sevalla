@@ -3,26 +3,26 @@
 page_title: "sevalla_application_process Resource - Sevalla"
 subcategory: ""
 description: |-
-  Manages a process for a Sevalla application.
+  Manages a process (web, worker, cron or job) of a Sevalla application.
 ---
 
 # sevalla_application_process (Resource)
 
-Manages a process for a Sevalla application.
+Manages a process (web, worker, cron or job) of a Sevalla application.
 
 ## Example Usage
 
 ```terraform
 # Web process with manual scaling
 resource "sevalla_application_process" "web" {
-  application_id = sevalla_application.example.id
-  display_name   = "web"
-  type           = "web"
-  entrypoint     = "npm start"
-  port           = 3000
+  application_id   = sevalla_application.example.id
+  display_name     = "web"
+  type             = "web"
+  entrypoint       = "npm start"
+  port             = 3000
   resource_type_id = data.sevalla_process_resource_types.all.process_resource_types[0].id
 
-  scaling_strategy {
+  scaling_strategy = {
     type           = "manual"
     instance_count = 2
   }
@@ -30,22 +30,22 @@ resource "sevalla_application_process" "web" {
 
 # Web process with horizontal autoscaling and health probes
 resource "sevalla_application_process" "web_autoscale" {
-  application_id = sevalla_application.example.id
-  display_name   = "web-autoscale"
-  type           = "web"
-  entrypoint     = "npm start"
-  port           = 8080
+  application_id   = sevalla_application.example.id
+  display_name     = "web-autoscale"
+  type             = "web"
+  entrypoint       = "npm start"
+  port             = 8080
   resource_type_id = data.sevalla_process_resource_types.all.process_resource_types[0].id
 
-  scaling_strategy {
-    type                = "horizontal"
-    min_instance_count  = 1
-    max_instance_count  = 5
-    target_cpu_percent  = 80
+  scaling_strategy = {
+    type               = "horizontal"
+    min_instance_count = 1
+    max_instance_count = 5
+    target_cpu_percent = 80
   }
 
-  liveness_probe {
-    http_get {
+  liveness_probe = {
+    http_get = {
       path = "/healthz"
       port = 8080
     }
@@ -54,8 +54,8 @@ resource "sevalla_application_process" "web_autoscale" {
     failure_threshold     = 3
   }
 
-  readiness_probe {
-    http_get {
+  readiness_probe = {
+    http_get = {
       path = "/ready"
       port = 8080
     }
@@ -66,44 +66,46 @@ resource "sevalla_application_process" "web_autoscale" {
 
 # Worker process
 resource "sevalla_application_process" "worker" {
-  application_id = sevalla_application.example.id
-  display_name   = "worker"
-  type           = "worker"
-  entrypoint     = "npm run worker"
+  application_id   = sevalla_application.example.id
+  display_name     = "worker"
+  type             = "worker"
+  entrypoint       = "npm run worker"
   resource_type_id = data.sevalla_process_resource_types.all.process_resource_types[0].id
 
-  scaling_strategy {
+  scaling_strategy = {
     type           = "manual"
     instance_count = 1
   }
 }
 
-# Cron process with timezone
+# Cron process that never runs twice at the same time
 resource "sevalla_application_process" "cron" {
-  application_id = sevalla_application.example.id
-  display_name   = "cleanup"
-  type           = "cron"
-  entrypoint     = "npm run cleanup"
-  resource_type_id = data.sevalla_process_resource_types.all.process_resource_types[0].id
-  schedule       = "0 */6 * * *"
-  time_zone      = "America/New_York"
+  application_id     = sevalla_application.example.id
+  display_name       = "cleanup"
+  type               = "cron"
+  entrypoint         = "npm run cleanup"
+  resource_type_id   = data.sevalla_process_resource_types.all.process_resource_types[0].id
+  schedule           = "0 */6 * * *"
+  time_zone          = "America/New_York"
+  concurrency_policy = "Forbid"
 
-  scaling_strategy {
+  scaling_strategy = {
     type           = "manual"
     instance_count = 1
   }
 }
 
-# Job process that runs before deployment
+# Job process that runs before each deployment
 resource "sevalla_application_process" "migrate" {
-  application_id = sevalla_application.example.id
-  display_name   = "migrate"
-  type           = "job"
-  entrypoint     = "npm run db:migrate"
-  resource_type_id = data.sevalla_process_resource_types.all.process_resource_types[0].id
-  job_start_policy = "beforeDeployment"
+  application_id          = sevalla_application.example.id
+  display_name            = "migrate"
+  type                    = "job"
+  entrypoint              = "npm run db:migrate"
+  resource_type_id        = data.sevalla_process_resource_types.all.process_resource_types[0].id
+  job_start_policy        = "beforeDeployment"
+  active_deadline_seconds = 900
 
-  scaling_strategy {
+  scaling_strategy = {
     type           = "manual"
     instance_count = 1
   }
@@ -116,22 +118,24 @@ resource "sevalla_application_process" "migrate" {
 ### Required
 
 - `application_id` (String) The ID of the application this process belongs to.
-- `display_name` (String) Human-readable name for the process (1-255 characters).
-- `resource_type_id` (String) The resource type ID determining CPU and memory allocation.
+- `display_name` (String) Human-readable name for the process (1-255 characters). Cannot contain backticks, dollar signs, double quotes, backslashes or control characters.
+- `resource_type_id` (String) The process resource type (machine size). Use the `sevalla_process_resource_types` data source to list them.
 - `scaling_strategy` (Attributes) The scaling configuration for the process. (see [below for nested schema](#nestedatt--scaling_strategy))
-- `type` (String) The process type. Valid values: web, worker, cron, job.
+- `type` (String) The process type. Valid values: `web`, `worker`, `cron`, `job`. Changing this creates a new process.
 
 ### Optional
 
-- `entrypoint` (String) Command used to start the process (max 1024 characters).
-- `ingress_protocol` (String) The ingress protocol. Valid values: http, grpc.
-- `is_ingress_enabled` (Boolean) Whether external traffic routing is enabled.
-- `job_start_policy` (String) When the job runs relative to deployments (job processes only). Valid values: beforeDeployment, afterSuccessDeployment, afterFailedDeployment.
-- `liveness_probe` (Attributes) Liveness probe configuration (web processes only). (see [below for nested schema](#nestedatt--liveness_probe))
+- `active_deadline_seconds` (Number) Maximum run time in seconds of a cron run or job. When unset or `0`, cron runs have no limit and jobs use the default of 600 seconds.
+- `concurrency_policy` (String) What a cron process does when the previous run is still active: `Forbid` skips the new run, `Replace` cancels the running one.
+- `entrypoint` (String) Command used to start the process (at most 1024 characters).
+- `ingress_protocol` (String) The ingress protocol (web processes only). Valid values: `http`, `grpc`.
+- `is_ingress_enabled` (Boolean) Whether external traffic is routed to the process (web processes only).
+- `job_start_policy` (String) When a job process runs relative to deployments. Valid values: `beforeDeployment`, `afterSuccessDeployment`, `afterFailedDeployment`.
+- `liveness_probe` (Attributes) Liveness probe (web processes only). Only HTTP GET probes can be configured. (see [below for nested schema](#nestedatt--liveness_probe))
 - `port` (Number) Port number the process listens on (1-65535).
-- `readiness_probe` (Attributes) Readiness probe configuration (web processes only). (see [below for nested schema](#nestedatt--readiness_probe))
-- `schedule` (String) Cron schedule expression (required for cron processes, max 100 characters).
-- `time_zone` (String) IANA time zone for cron schedule (e.g. America/New_York).
+- `readiness_probe` (Attributes) Readiness probe (web processes only). Only HTTP GET probes can be configured. (see [below for nested schema](#nestedatt--readiness_probe))
+- `schedule` (String) Cron expression for the schedule (required for cron processes, at most 100 characters).
+- `time_zone` (String) IANA time zone for the cron schedule (e.g. `America/New_York`).
 
 ### Read-Only
 
@@ -149,17 +153,17 @@ resource "sevalla_application_process" "migrate" {
 
 Required:
 
-- `type` (String) The scaling type. Valid values: manual, horizontal.
+- `type` (String) The scaling type. Valid values: `manual`, `horizontal`.
 
 Optional:
 
-- `instance_count` (Number) The number of instances (manual scaling only). Range: 0-50.
-- `max_instance_count` (Number) Maximum number of instances (horizontal scaling only). Range: 0-50.
-- `min_instance_count` (Number) Minimum number of instances (horizontal scaling only). Range: 0-50.
-- `scale_down_increment` (Number) Number of instances to remove per scale-down (1-5).
-- `scale_down_interval_seconds` (Number) Seconds between scale-down evaluations (1-60000).
-- `scale_up_increment` (Number) Number of instances to add per scale-up (1-5).
-- `scale_up_interval_seconds` (Number) Seconds between scale-up evaluations (1-60000).
+- `instance_count` (Number) The number of instances (manual scaling only, 0-50).
+- `max_instance_count` (Number) Maximum number of instances (horizontal scaling only, 0-50).
+- `min_instance_count` (Number) Minimum number of instances (horizontal scaling only, 0-50).
+- `scale_down_increment` (Number) Number of instances to remove per scale-down event (1-5).
+- `scale_down_interval_seconds` (Number) Cooldown in seconds between scale-down events (1-60000).
+- `scale_up_increment` (Number) Number of instances to add per scale-up event (1-5).
+- `scale_up_interval_seconds` (Number) Cooldown in seconds between scale-up events (1-60000).
 - `target_cpu_percent` (Number) Target CPU utilization percentage for autoscaling (1-100).
 - `target_memory_percent` (Number) Target memory utilization percentage for autoscaling (1-100).
 
@@ -169,33 +173,31 @@ Optional:
 
 Optional:
 
-- `exec` (Attributes) Exec probe: runs a command inside the container. (see [below for nested schema](#nestedatt--liveness_probe--exec))
 - `failure_threshold` (Number) Consecutive failures required to be considered unhealthy.
 - `http_get` (Attributes) HTTP GET probe. (see [below for nested schema](#nestedatt--liveness_probe--http_get))
-- `initial_delay_seconds` (Number) Seconds before the probe starts after container start.
+- `initial_delay_seconds` (Number) Seconds after the container starts before the probe starts.
 - `period_seconds` (Number) How often (in seconds) to perform the probe.
 - `success_threshold` (Number) Consecutive successes required to be considered healthy.
-- `tcp_socket` (Attributes) TCP socket probe. (see [below for nested schema](#nestedatt--liveness_probe--tcp_socket))
-- `timeout_seconds` (Number) Seconds after which the probe times out.
+- `timeout_seconds` (Number) Seconds after which the probe times out. The API defaults it to 120.
 
-<a id="nestedatt--liveness_probe--exec"></a>
-### Nested Schema for `liveness_probe.exec`
+Read-Only:
 
-Required:
-
-- `command` (List of String) Command to execute.
-
+- `exec` (Attributes) Exec probe that runs a command inside the container. Read-only: the API only accepts HTTP GET probes. (see [below for nested schema](#nestedatt--liveness_probe--exec))
+- `tcp_socket` (Attributes) TCP socket probe. Read-only: the API only accepts HTTP GET probes. (see [below for nested schema](#nestedatt--liveness_probe--tcp_socket))
 
 <a id="nestedatt--liveness_probe--http_get"></a>
 ### Nested Schema for `liveness_probe.http_get`
+
+Required:
+
+- `path` (String) Path to probe. A probe without a path is not saved.
 
 Optional:
 
 - `host` (String) Hostname for the probe request.
 - `http_headers` (Attributes List) Custom HTTP headers for the probe request. (see [below for nested schema](#nestedatt--liveness_probe--http_get--http_headers))
-- `path` (String) Path to probe.
 - `port` (Number) Port to probe (1-65535).
-- `scheme` (String) URI scheme. Valid values: HTTP, HTTPS.
+- `scheme` (String) URI scheme. Valid values: `HTTP`, `HTTPS`.
 
 <a id="nestedatt--liveness_probe--http_get--http_headers"></a>
 ### Nested Schema for `liveness_probe.http_get.http_headers`
@@ -207,16 +209,21 @@ Required:
 
 
 
+<a id="nestedatt--liveness_probe--exec"></a>
+### Nested Schema for `liveness_probe.exec`
+
+Read-Only:
+
+- `command` (List of String) Command to execute.
+
+
 <a id="nestedatt--liveness_probe--tcp_socket"></a>
 ### Nested Schema for `liveness_probe.tcp_socket`
 
-Required:
-
-- `port` (Number) Port to connect to (1-65535).
-
-Optional:
+Read-Only:
 
 - `host` (String) Hostname to connect to.
+- `port` (Number) Port to connect to.
 
 
 
@@ -225,33 +232,31 @@ Optional:
 
 Optional:
 
-- `exec` (Attributes) Exec probe: runs a command inside the container. (see [below for nested schema](#nestedatt--readiness_probe--exec))
 - `failure_threshold` (Number) Consecutive failures required to be considered unhealthy.
 - `http_get` (Attributes) HTTP GET probe. (see [below for nested schema](#nestedatt--readiness_probe--http_get))
-- `initial_delay_seconds` (Number) Seconds before the probe starts after container start.
+- `initial_delay_seconds` (Number) Seconds after the container starts before the probe starts.
 - `period_seconds` (Number) How often (in seconds) to perform the probe.
 - `success_threshold` (Number) Consecutive successes required to be considered healthy.
-- `tcp_socket` (Attributes) TCP socket probe. (see [below for nested schema](#nestedatt--readiness_probe--tcp_socket))
-- `timeout_seconds` (Number) Seconds after which the probe times out.
+- `timeout_seconds` (Number) Seconds after which the probe times out. The API defaults it to 120.
 
-<a id="nestedatt--readiness_probe--exec"></a>
-### Nested Schema for `readiness_probe.exec`
+Read-Only:
 
-Required:
-
-- `command` (List of String) Command to execute.
-
+- `exec` (Attributes) Exec probe that runs a command inside the container. Read-only: the API only accepts HTTP GET probes. (see [below for nested schema](#nestedatt--readiness_probe--exec))
+- `tcp_socket` (Attributes) TCP socket probe. Read-only: the API only accepts HTTP GET probes. (see [below for nested schema](#nestedatt--readiness_probe--tcp_socket))
 
 <a id="nestedatt--readiness_probe--http_get"></a>
 ### Nested Schema for `readiness_probe.http_get`
+
+Required:
+
+- `path` (String) Path to probe. A probe without a path is not saved.
 
 Optional:
 
 - `host` (String) Hostname for the probe request.
 - `http_headers` (Attributes List) Custom HTTP headers for the probe request. (see [below for nested schema](#nestedatt--readiness_probe--http_get--http_headers))
-- `path` (String) Path to probe.
 - `port` (Number) Port to probe (1-65535).
-- `scheme` (String) URI scheme. Valid values: HTTP, HTTPS.
+- `scheme` (String) URI scheme. Valid values: `HTTP`, `HTTPS`.
 
 <a id="nestedatt--readiness_probe--http_get--http_headers"></a>
 ### Nested Schema for `readiness_probe.http_get.http_headers`
@@ -263,13 +268,18 @@ Required:
 
 
 
+<a id="nestedatt--readiness_probe--exec"></a>
+### Nested Schema for `readiness_probe.exec`
+
+Read-Only:
+
+- `command` (List of String) Command to execute.
+
+
 <a id="nestedatt--readiness_probe--tcp_socket"></a>
 ### Nested Schema for `readiness_probe.tcp_socket`
 
-Required:
-
-- `port` (Number) Port to connect to (1-65535).
-
-Optional:
+Read-Only:
 
 - `host` (String) Hostname to connect to.
+- `port` (Number) Port to connect to.

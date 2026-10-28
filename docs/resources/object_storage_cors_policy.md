@@ -18,7 +18,6 @@ resource "sevalla_object_storage_cors_policy" "example" {
   allowed_origins   = ["https://example.com", "https://app.example.com"]
   allowed_methods   = ["GET", "PUT", "POST"]
   allowed_headers   = ["Content-Type", "Authorization"]
-  max_age           = 3600
 }
 ```
 
@@ -27,14 +26,13 @@ resource "sevalla_object_storage_cors_policy" "example" {
 
 ### Required
 
-- `allowed_headers` (List of String) List of allowed HTTP headers.
-- `allowed_methods` (List of String) List of allowed HTTP methods.
-- `allowed_origins` (List of String) List of allowed origins.
+- `allowed_methods` (List of String) HTTP methods allowed by the rule. Valid values: `GET`, `PUT`, `POST`, `DELETE`, `HEAD`.
+- `allowed_origins` (List of String) Origins allowed by the rule (1-100). Use `*` to allow all origins.
 - `object_storage_id` (String) The ID of the object storage bucket.
 
 ### Optional
 
-- `max_age` (Number) The maximum age in seconds for preflight request caching.
+- `allowed_headers` (List of String) HTTP headers allowed in CORS requests (1-100). Omit to allow no specific headers.
 
 ### Read-Only
 

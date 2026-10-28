@@ -27,4 +27,4 @@ resource "sevalla_application_deployment_hook" "example" {
 
 ### Read-Only
 
-- `url` (String, Sensitive) The deployment hook URL.
+- `url` (String, Sensitive) The deployment hook URL. Send an HTTP POST request to it to trigger a deployment.

@@ -3,12 +3,12 @@
 page_title: "sevalla_application_tcp_proxy Resource - Sevalla"
 subcategory: ""
 description: |-
-  Manages a TCP proxy for a Sevalla application.
+  Manages a TCP proxy that exposes a port of a Sevalla application process to the internet.
 ---
 
 # sevalla_application_tcp_proxy (Resource)
 
-Manages a TCP proxy for a Sevalla application.
+Manages a TCP proxy that exposes a port of a Sevalla application process to the internet.
 
 ## Example Usage
 
@@ -26,14 +26,14 @@ resource "sevalla_application_tcp_proxy" "example" {
 ### Required
 
 - `application_id` (String) The ID of the application this TCP proxy belongs to.
-- `port` (Number) The internal port number.
-- `process_id` (String) The ID of the process this TCP proxy belongs to.
+- `port` (Number) The internal container port to expose (1-65535).
+- `process_id` (String) The ID of the process to attach the TCP proxy to.
 
 ### Read-Only
 
 - `created_at` (String) The timestamp when the TCP proxy was created.
-- `external_port` (Number) The external port number assigned by the platform.
-- `hostname` (String) The hostname for the TCP proxy.
+- `external_port` (Number) The public port to connect to. It can change once when the proxy moves behind the external proxy, so read it together with `hostname`.
+- `hostname` (String) The public hostname to connect to.
 - `id` (String) The unique identifier of the TCP proxy.
-- `status` (String) The current status of the TCP proxy.
+- `status` (String) The status of the TCP proxy: `creating`, `ready`, `failed` or `deleting`.
 - `updated_at` (String) The timestamp when the TCP proxy was last updated.

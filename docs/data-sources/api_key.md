@@ -31,10 +31,34 @@ output "api_key_name" {
 
 ### Read-Only
 
+- `capabilities` (Attributes List) The capabilities (permissions) assigned to this API key. (see [below for nested schema](#nestedatt--capabilities))
 - `company_id` (String) The company ID that owns the API key.
 - `created_at` (String) When the API key was created.
 - `enabled` (Boolean) Whether the API key is enabled.
 - `expires_at` (String) The expiration date of the API key.
+- `last_used_at` (String) When the API key was last used.
+- `masked_token` (String) The token with all but its first 6 and last 4 characters masked.
 - `name` (String) The name of the API key.
+- `role_ids` (List of String) The role IDs assigned to this API key.
+- `roles` (Attributes List) The roles assigned to this API key. (see [below for nested schema](#nestedatt--roles))
+- `source` (String) How the API key was created: `DASHBOARD`, `CLI`, `EXTERNAL`, `MCP` or `SUPPORT_MCP`.
 - `token` (String, Sensitive) The API key token. Only available on create; will be null for existing keys.
 - `updated_at` (String) When the API key was last updated.
+
+<a id="nestedatt--capabilities"></a>
+### Nested Schema for `capabilities`
+
+Read-Only:
+
+- `id_resource` (String) The resource ID this permission is scoped to, if any.
+- `permission` (String) The permission string.
+
+
+<a id="nestedatt--roles"></a>
+### Nested Schema for `roles`
+
+Read-Only:
+
+- `description` (String) The description of the role.
+- `id` (String) The unique identifier of the role.
+- `name` (String) The name of the role.

@@ -36,19 +36,19 @@ resource "sevalla_load_balancer_destination" "external" {
 ### Required
 
 - `load_balancer_id` (String) The ID of the load balancer.
-- `service_id` (String) The ID of the service to add as a destination.
-- `service_type` (String) The service type. Valid values: APP, STATIC_SITE, OBJECT_STORAGE, EXTERNAL, LOAD_BALANCER.
+- `service_type` (String) The type of the backing service. Valid values: `APP`, `STATIC_SITE`, `OBJECT_STORAGE`, `LOAD_BALANCER`, `EXTERNAL`.
 
 ### Optional
 
-- `latitude` (Number) The latitude for geo routing.
-- `longitude` (Number) The longitude for geo routing.
-- `url` (String) The URL for external destinations.
-- `weight` (Number) The weight for weighted routing.
+- `is_enabled` (Boolean) Whether the destination receives traffic. Defaults to `true`.
+- `latitude` (Number) The latitude for GEO routing (-90 to 90).
+- `longitude` (Number) The longitude for GEO routing (-180 to 180).
+- `service_id` (String) The ID of the backing service. Required for every type except `EXTERNAL`, where it must not be set.
+- `url` (String) The URL of an `EXTERNAL` destination.
+- `weight` (Number) The traffic weight for weighted routing (0-10000). Higher values receive proportionally more traffic.
 
 ### Read-Only
 
 - `created_at` (String) The timestamp when the destination was created.
 - `id` (String) The unique identifier of the destination.
-- `is_enabled` (Boolean) Whether the destination is enabled.
 - `updated_at` (String) The timestamp when the destination was last updated.

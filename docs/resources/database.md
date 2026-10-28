@@ -24,7 +24,7 @@ resource "sevalla_database" "postgres" {
   db_user          = "myapp_user"
   db_password      = var.db_password
 
-  extensions {
+  extensions = {
     enable_postgis = true
     enable_vector  = true
   }
@@ -47,26 +47,26 @@ resource "sevalla_database" "redis" {
 
 ### Required
 
-- `cluster_id` (String) The cluster where the database is deployed. Cannot be changed after creation.
-- `db_name` (String) The database name. Cannot be changed after creation.
-- `db_password` (String, Sensitive) The database password. Cannot be changed after creation.
-- `display_name` (String) The display name of the database.
-- `resource_type_id` (String) The resource type (size) of the database. Can be changed to resize.
-- `type` (String) The database engine type. Valid values: postgresql, mysql, redis, mariadb. Cannot be changed after creation.
-- `version` (String) The database engine version. Cannot be changed after creation.
+- `cluster_id` (String) The cluster where the database is deployed. Changing this creates a new database.
+- `db_name` (String) The name of the database to create (2-100 characters). Redis and Valkey ignore it. Changing this creates a new database, except for Redis and Valkey.
+- `db_password` (String, Sensitive) The password of the database user (4-100 characters). Changing it resets the password in place. The API never returns it, so after an import the configured value is recorded without being applied.
+- `display_name` (String) The display name of the database (2-64 characters).
+- `resource_type_id` (String) The resource type (size) of the database. Changing it resizes the database in place; on OCI clusters, resizing a DB1 database deletes its backups.
+- `type` (String) The database engine type. Valid values: `postgresql`, `mysql`, `mariadb`, `redis`, `valkey`. Changing this creates a new database.
+- `version` (String) The database engine version. The available versions depend on the type and cluster. Changing this creates a new database.
 
 ### Optional
 
-- `db_user` (String) The database user. Cannot be "root" or "postgres". If omitted, the database engine default user is used. Cannot be changed after creation.
-- `extensions` (Attributes) PostgreSQL extensions to enable. Only applicable when type is postgresql. Cannot be changed after creation. (see [below for nested schema](#nestedatt--extensions))
-- `project_id` (String) The project ID to associate with this database.
+- `db_user` (String) The database user (2-32 characters, not `root` or `postgres`). Defaults to the engine's default user. Redis and Valkey ignore it. Changing this creates a new database, except for Redis and Valkey.
+- `extensions` (Attributes) PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing or removing them creates a new database; setting them where none were recorded (e.g. after an import) only records them. (see [below for nested schema](#nestedatt--extensions))
+- `project_id` (String) The ID of the project to group the database under. Removing it removes the database from the project.
 
 ### Read-Only
 
 - `cluster_display_name` (String) The display name of the cluster.
 - `cluster_location` (String) The location of the cluster.
 - `company_id` (String) The company ID that owns the database.
-- `cpu_limit` (Number) The CPU limit for the database.
+- `cpu_limit` (Number) The CPU limit for the database in millicores.
 - `created_at` (String) The timestamp when the database was created.
 - `external_hostname` (String, Sensitive) The external hostname for connecting to the database.
 - `external_port` (String) The external port for connecting to the database.
@@ -74,11 +74,11 @@ resource "sevalla_database" "redis" {
 - `internal_hostname` (String) The internal hostname for connecting to the database.
 - `internal_port` (String) The internal port for connecting to the database.
 - `is_suspended` (Boolean) Whether the database is currently suspended.
-- `memory_limit` (Number) The memory limit for the database in bytes.
+- `memory_limit` (Number) The memory limit for the database in megabytes.
 - `name` (String) The system-generated name of the database.
 - `resource_type_name` (String) The name of the resource type.
 - `status` (String) The current status of the database.
-- `storage_size` (Number) The storage size for the database in bytes.
+- `storage_size` (Number) The storage size for the database in megabytes.
 - `updated_at` (String) The timestamp when the database was last updated.
 
 <a id="nestedatt--extensions"></a>

@@ -3,12 +3,12 @@
 page_title: "sevalla_pipeline_stage_application Resource - Sevalla"
 subcategory: ""
 description: |-
-  Attaches an application to a pipeline stage in Sevalla.
+  Attaches an application to a pipeline stage in Sevalla. The API does not list the applications of a stage, so removing the application from the stage outside Terraform is not detected.
 ---
 
 # sevalla_pipeline_stage_application (Resource)
 
-Attaches an application to a pipeline stage in Sevalla.
+Attaches an application to a pipeline stage in Sevalla. The API does not list the applications of a stage, so removing the application from the stage outside Terraform is not detected.
 
 ## Example Usage
 

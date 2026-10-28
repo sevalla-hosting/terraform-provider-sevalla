@@ -32,8 +32,8 @@ output "resource_type_names" {
 
 Read-Only:
 
-- `category` (String) The category of the process resource type.
+- `category` (String) The category of the process resource type: `hobby`, `standard`, `cpuOptimized` or `memoryOptimized`.
 - `cpu_limit` (Number) The CPU limit in millicores.
 - `id` (String) The unique identifier of the process resource type.
-- `memory_limit` (Number) The memory limit in bytes.
+- `memory_limit` (Number) The memory limit in megabytes.
 - `name` (String) The name of the process resource type.

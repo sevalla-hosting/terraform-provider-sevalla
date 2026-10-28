@@ -35,13 +35,13 @@ resource "sevalla_docker_registry" "ghcr" {
 
 ### Required
 
-- `name` (String) The name of the Docker registry credential.
+- `name` (String) The name of the Docker registry credential (1-255 characters).
 - `secret` (String, Sensitive) The secret (password/token) for the Docker registry. Write-only; not returned by the API.
 - `username` (String, Sensitive) The username for the Docker registry.
 
 ### Optional
 
-- `registry` (String) The Docker registry type (e.g., gcr, ecr, dockerHub, github, gitlab, digitalOcean, custom).
+- `registry` (String) The Docker registry provider: `dockerHub` (default), `gcr`, `ecr`, `github`, `gitlab`, `digitalOcean` or `custom`.
 
 ### Read-Only
 

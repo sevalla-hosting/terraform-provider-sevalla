@@ -32,10 +32,10 @@ output "static_site_names" {
 
 Read-Only:
 
-- `created_at` (String) When the static site was created.
+- `created_at` (String, Deprecated) Always null.
 - `display_name` (String) The display name of the static site.
 - `id` (String) The unique identifier of the static site.
 - `name` (String) The system-generated name of the static site.
-- `source` (String) The source type of the static site.
+- `source` (String, Deprecated) Always null.
 - `status` (String) The current status of the static site.
-- `updated_at` (String) When the static site was last updated.
+- `updated_at` (String, Deprecated) Always null.

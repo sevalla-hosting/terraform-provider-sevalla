@@ -23,7 +23,7 @@ resource "sevalla_project" "example" {
 
 ### Required
 
-- `display_name` (String) The display name of the project.
+- `display_name` (String) The display name of the project (1-64 characters).
 
 ### Read-Only
 

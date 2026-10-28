@@ -55,19 +55,20 @@ terraform apply
 | Resource | Description |
 |----------|-------------|
 | `sevalla_application` | Web application |
+| `sevalla_application_deployment` | Deployment of an application |
 | `sevalla_application_domain` | Custom domain for an application |
-| `sevalla_application_env_var` | Environment variable for an application |
-| `sevalla_application_process` | Process (web, worker, cron) for an application |
+| `sevalla_application_environment_variable` | Environment variable for an application |
+| `sevalla_application_process` | Process (web, worker, cron, job) for an application |
 | `sevalla_application_tcp_proxy` | TCP proxy for an application |
 | `sevalla_application_private_port` | Private port for an application |
 | `sevalla_application_ip_restriction` | IP restriction rules for an application |
 | `sevalla_application_deployment_hook` | Deployment hook for an application |
-| `sevalla_database` | Managed database (PostgreSQL, MySQL, Redis) |
+| `sevalla_database` | Managed database (PostgreSQL, MySQL, MariaDB, Redis, Valkey) |
 | `sevalla_database_internal_connection` | Internal connection between database and application |
 | `sevalla_database_ip_restriction` | IP restriction rules for a database |
 | `sevalla_static_site` | Static site |
 | `sevalla_static_site_domain` | Custom domain for a static site |
-| `sevalla_static_site_env_var` | Environment variable for a static site |
+| `sevalla_static_site_environment_variable` | Environment variable for a static site |
 | `sevalla_load_balancer` | Load balancer |
 | `sevalla_load_balancer_domain` | Custom domain for a load balancer |
 | `sevalla_load_balancer_destination` | Destination application for a load balancer |
@@ -81,7 +82,7 @@ terraform apply
 | `sevalla_docker_registry` | Docker registry credentials |
 | `sevalla_webhook` | Webhook |
 | `sevalla_api_key` | API key |
-| `sevalla_global_env_var` | Global environment variable |
+| `sevalla_global_environment_variable` | Global environment variable |
 
 ## Data sources
 
@@ -101,6 +102,8 @@ terraform apply
 | `sevalla_docker_registry` | Look up a Docker registry |
 | `sevalla_webhook` | Look up a webhook |
 | `sevalla_api_key` | Look up an API key |
+| `sevalla_api_key_permissions` | List API key permissions |
+| `sevalla_api_key_roles` | List API key roles |
 | `sevalla_clusters` | List available clusters |
 | `sevalla_process_resource_types` | List process resource types |
 | `sevalla_database_resource_types` | List database resource types |

@@ -3,12 +3,12 @@
 page_title: "sevalla_project_service Resource - Sevalla"
 subcategory: ""
 description: |-
-  Attaches a service (application, database, static site, etc.) to a Sevalla project.
+  Adds a service (application, database, pipeline or object storage bucket) to a Sevalla project. Adding a pipeline also moves the applications in its stages into the project. Do not also manage the same assignment with the service's own project_id attribute.
 ---
 
 # sevalla_project_service (Resource)
 
-Attaches a service (application, database, static site, etc.) to a Sevalla project.
+Adds a service (application, database, pipeline or object storage bucket) to a Sevalla project. Adding a pipeline also moves the applications in its stages into the project. Do not also manage the same assignment with the service's own `project_id` attribute.
 
 ## Example Usage
 
@@ -17,7 +17,7 @@ Attaches a service (application, database, static site, etc.) to a Sevalla proje
 resource "sevalla_project_service" "app" {
   project_id   = sevalla_project.example.id
   service_id   = sevalla_application.example.id
-  service_type = "application"
+  service_type = "app"
 }
 
 # Attach a database to a project
@@ -35,7 +35,7 @@ resource "sevalla_project_service" "db" {
 
 - `project_id` (String) The ID of the project.
 - `service_id` (String) The ID of the service to attach.
-- `service_type` (String) The type of the service (app, database, pipeline, object-storage).
+- `service_type` (String) The type of the service. Valid values: `app`, `database`, `pipeline`, `object-storage`.
 
 ### Read-Only
 

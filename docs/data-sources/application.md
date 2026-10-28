@@ -36,6 +36,8 @@ output "app_name" {
 - `build_cache_enabled` (Boolean) Whether the build cache is enabled.
 - `build_path` (String) The build path within the repository.
 - `build_type` (String) The build type.
+- `buildpacks` (Attributes List) List of buildpack configurations for the application. (see [below for nested schema](#nestedatt--buildpacks))
+- `cdn_enabled` (Boolean) Whether the CDN is enabled for the application.
 - `cluster_id` (String) The cluster where the application is deployed.
 - `company_id` (String) The company ID that owns the application.
 - `created_at` (String) When the application was created.
@@ -46,6 +48,8 @@ output "app_name" {
 - `docker_image` (String) The Docker image to deploy.
 - `docker_registry_credential_id` (String) The ID of the Docker registry credential.
 - `dockerfile_path` (String) The path to the Dockerfile.
+- `edge_cache_enabled` (Boolean) Whether edge caching is enabled for the application.
+- `git_lfs_enabled` (Boolean) Whether Git LFS objects are fetched during the source checkout step.
 - `git_type` (String) The Git provider type.
 - `hibernate_after_seconds` (Number) Seconds of inactivity before hibernation.
 - `hibernation_enabled` (Boolean) Whether hibernation is enabled.
@@ -61,4 +65,12 @@ output "app_name" {
 - `status` (String) The current status of the application.
 - `type` (String) The application type.
 - `updated_at` (String) When the application was last updated.
-- `wait_for_checks` (Boolean) Whether to wait for checks before deploying.
+- `wait_for_checks` (Boolean, Deprecated) Always null.
+
+<a id="nestedatt--buildpacks"></a>
+### Nested Schema for `buildpacks`
+
+Read-Only:
+
+- `order` (Number) The order of the buildpack.
+- `source` (String) The source of the buildpack.

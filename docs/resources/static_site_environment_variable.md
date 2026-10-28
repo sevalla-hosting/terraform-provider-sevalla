@@ -38,15 +38,15 @@ resource "sevalla_static_site_environment_variable" "preview" {
 
 ### Required
 
-- `key` (String) The environment variable key.
+- `key` (String) The environment variable key (1-255 characters). Must be unique within the static site.
 - `static_site_id` (String) The ID of the static site this environment variable belongs to.
-- `value` (String, Sensitive) The environment variable value.
+- `value` (String, Sensitive) The environment variable value (at most 32768 characters).
 
 ### Optional
 
 - `branch` (String) Git branch this variable is scoped to. When omitted, the variable applies to all branches.
-- `is_preview` (Boolean) Whether this variable is used in preview deployments. Defaults to true.
-- `is_production` (Boolean) Whether this variable is used in production deployments. Defaults to true.
+- `is_preview` (Boolean) Whether this variable is used in preview deployments. Defaults to `true`.
+- `is_production` (Boolean) Whether this variable is used in production deployments. Defaults to `true`.
 
 ### Read-Only
 

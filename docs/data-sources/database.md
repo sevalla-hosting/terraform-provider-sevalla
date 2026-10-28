@@ -35,23 +35,34 @@ output "db_internal_host" {
 - `cluster_id` (String) The cluster where the database is deployed.
 - `cluster_location` (String) The location of the cluster.
 - `company_id` (String) The company ID that owns the database.
-- `cpu_limit` (Number) The CPU limit for the database.
+- `cpu_limit` (Number) The CPU limit for the database in millicores.
 - `created_at` (String) When the database was created.
-- `db_name` (String) The database name.
-- `db_password` (String, Sensitive) The database password.
+- `db_name` (String) The database name. `0` for Redis and Valkey.
+- `db_password` (String, Sensitive) Always null: the API never returns the password.
+- `db_user` (String) The database user. Null for Redis and Valkey.
 - `display_name` (String) The display name of the database.
+- `extensions` (Attributes) Always null: the API does not return the enabled extensions. (see [below for nested schema](#nestedatt--extensions))
 - `external_hostname` (String, Sensitive) The external hostname for connecting to the database.
-- `external_port` (Number) The external port for connecting to the database.
+- `external_port` (String) The external port for connecting to the database.
 - `internal_hostname` (String) The internal hostname for connecting to the database.
-- `internal_port` (Number) The internal port for connecting to the database.
+- `internal_port` (String) The internal port for connecting to the database.
 - `is_suspended` (Boolean) Whether the database is suspended.
-- `memory_limit` (Number) The memory limit for the database in bytes.
+- `memory_limit` (Number) The memory limit for the database in megabytes.
 - `name` (String) The system-generated name of the database.
 - `project_id` (String) The project ID associated with this database.
 - `resource_type_id` (String) The resource type (size) of the database.
 - `resource_type_name` (String) The name of the resource type.
 - `status` (String) The current status of the database.
-- `storage_size` (Number) The storage size for the database in bytes.
+- `storage_size` (Number) The storage size for the database in megabytes.
 - `type` (String) The database engine type.
 - `updated_at` (String) When the database was last updated.
 - `version` (String) The database engine version.
+
+<a id="nestedatt--extensions"></a>
+### Nested Schema for `extensions`
+
+Read-Only:
+
+- `enable_cron` (Boolean) Whether the pg_cron extension is enabled.
+- `enable_postgis` (Boolean) Whether the PostGIS extension is enabled.
+- `enable_vector` (Boolean) Whether the pgvector extension is enabled.

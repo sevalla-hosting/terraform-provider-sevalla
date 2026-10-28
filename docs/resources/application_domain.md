@@ -45,20 +45,19 @@ resource "sevalla_application_domain" "custom_ssl" {
 
 ### Optional
 
-- `custom_ssl_cert` (String, Sensitive) The custom SSL certificate in PEM format.
-- `custom_ssl_key` (String, Sensitive) The custom SSL private key in PEM format.
-- `is_wildcard` (Boolean) Whether this is a wildcard domain.
+- `custom_ssl_cert` (String, Sensitive) Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing this creates a new domain.
+- `custom_ssl_key` (String, Sensitive) Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing this creates a new domain.
+- `is_wildcard` (Boolean) Whether the domain is a wildcard domain that matches all subdomains. Defaults to `false`. Changing this creates a new domain.
 
 ### Read-Only
 
-- `cname_target` (String) The CNAME target for DNS configuration.
 - `created_at` (String) The timestamp when the domain was created.
-- `enabled` (Boolean) Whether the domain is enabled.
+- `dns_records` (String) JSON-encoded DNS records to create for the domain (e.g. `[{"type":"CNAME","name":"app.example.com","value":"..."}]`), or null when none are needed. Decode it with `jsondecode()`.
 - `id` (String) The unique identifier of the domain.
+- `is_enabled` (Boolean) Whether the domain is enabled.
 - `is_primary` (Boolean) Whether this is the primary domain.
-- `ssl_status` (String) The SSL certificate status.
-- `status` (String) The status of the domain.
-- `type` (String) The domain type (custom or system).
+- `status` (String) The verification status: `VERIFICATION`, `POINTING`, `ACTIVE` or `TIMED_OUT`.
+- `type` (String) The domain type: `CUSTOM` for user-added domains or `SYSTEM` for platform-assigned ones.
 - `updated_at` (String) The timestamp when the domain was last updated.
 
 ## Import

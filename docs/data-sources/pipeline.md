@@ -35,5 +35,16 @@ output "pipeline_type" {
 - `created_at` (String) When the pipeline was created.
 - `display_name` (String) The display name of the pipeline.
 - `project_id` (String) The project ID associated with the pipeline.
+- `stages` (Attributes List) The stages of the pipeline ordered by position, including the Dev and Production stages the API creates with the pipeline. (see [below for nested schema](#nestedatt--stages))
 - `type` (String) The type of the pipeline (trunk or branch).
 - `updated_at` (String) When the pipeline was last updated.
+
+<a id="nestedatt--stages"></a>
+### Nested Schema for `stages`
+
+Read-Only:
+
+- `display_name` (String) The display name of the stage.
+- `id` (String) The unique identifier of the stage.
+- `order` (Number) The position of the stage, starting from 0.
+- `type` (String) The stage type: `standard`, `prod` or `preview`.
