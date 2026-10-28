@@ -1,5 +1,24 @@
 package client
 
+import "encoding/json"
+
+// Nullable is a request field that is omitted when unset (with the omitzero
+// tag), and otherwise sent as its value or, when Value is nil, as JSON null.
+type Nullable[T any] struct {
+	Set   bool
+	Value *T
+}
+
+// Null returns a Nullable that is sent as JSON null.
+func Null[T any]() Nullable[T] { return Nullable[T]{Set: true} }
+
+// NullableOf returns a Nullable that is sent as v, or as JSON null when v is nil.
+func NullableOf[T any](v *T) Nullable[T] { return Nullable[T]{Set: true, Value: v} }
+
+func (n Nullable[T]) IsZero() bool { return !n.Set }
+
+func (n Nullable[T]) MarshalJSON() ([]byte, error) { return json.Marshal(n.Value) }
+
 type PaginatedResponse[T any] struct {
 	Data   []T `json:"data"`
 	Total  int `json:"total"`
@@ -27,8 +46,9 @@ type Application struct {
 	HibernationEnabled         bool              `json:"hibernation_enabled"`
 	HibernateAfterSeconds      *int64            `json:"hibernate_after_seconds"`
 	AutoDeploy                 bool              `json:"auto_deploy"`
-	WaitForChecks              bool              `json:"wait_for_checks"`
 	IsSuspended                bool              `json:"is_suspended"`
+	IsCDNEnabled               *bool             `json:"is_cdn_enabled"`
+	IsEdgeCacheEnabled         *bool             `json:"is_edge_cache_enabled"`
 	ClusterID                  *string           `json:"cluster_id"`
 	GitType                    *string           `json:"git_type"`
 	RepoURL                    *string           `json:"repo_url"`
@@ -62,35 +82,41 @@ type CreateApplicationRequest struct {
 }
 
 type UpdateApplicationRequest struct {
-	DisplayName                *string           `json:"display_name,omitempty"`
-	AutoDeploy                 *bool             `json:"auto_deploy,omitempty"`
-	DefaultBranch              *string           `json:"default_branch,omitempty"`
-	HibernationEnabled         *bool             `json:"hibernation_enabled,omitempty"`
-	HibernateAfterSeconds      *int64            `json:"hibernate_after_seconds,omitempty"`
-	BuildType                  *string           `json:"build_type,omitempty"`
-	BuildPath                  *string           `json:"build_path,omitempty"`
-	DockerfilePath             *string           `json:"dockerfile_path,omitempty"`
-	DockerContext              *string           `json:"docker_context,omitempty"`
-	BuildCacheEnabled          *bool             `json:"build_cache_enabled,omitempty"`
-	GitLFSEnabled              *bool             `json:"git_lfs_enabled,omitempty"`
-	DockerRegistryCredentialID *string           `json:"docker_registry_credential_id,omitempty"`
-	PackBuilder                *string           `json:"pack_builder,omitempty"`
-	NixpacksVersion            *string           `json:"nixpacks_version,omitempty"`
-	AllowDeployPaths           []string          `json:"allow_deploy_paths,omitempty"`
-	IgnoreDeployPaths          []string          `json:"ignore_deploy_paths,omitempty"`
-	Buildpacks                 []BuildpackConfig `json:"buildpacks,omitempty"`
-	Source                     *string           `json:"source,omitempty"`
-	GitType                    *string           `json:"git_type,omitempty"`
-	RepoURL                    *string           `json:"repo_url,omitempty"`
-	DockerImage                *string           `json:"docker_image,omitempty"`
+	DisplayName                *string `json:"display_name,omitempty"`
+	AutoDeploy                 *bool   `json:"auto_deploy,omitempty"`
+	DefaultBranch              *string `json:"default_branch,omitempty"`
+	HibernationEnabled         *bool   `json:"hibernation_enabled,omitempty"`
+	HibernateAfterSeconds      *int64  `json:"hibernate_after_seconds,omitempty"`
+	BuildType                  *string `json:"build_type,omitempty"`
+	BuildPath                  *string `json:"build_path,omitempty"`
+	DockerfilePath             *string `json:"dockerfile_path,omitempty"`
+	DockerContext              *string `json:"docker_context,omitempty"`
+	BuildCacheEnabled          *bool   `json:"build_cache_enabled,omitempty"`
+	GitLFSEnabled              *bool   `json:"git_lfs_enabled,omitempty"`
+	DockerRegistryCredentialID *string `json:"docker_registry_credential_id,omitempty"`
+	PackBuilder                *string `json:"pack_builder,omitempty"`
+	NixpacksVersion            *string `json:"nixpacks_version,omitempty"`
+	// A non-nil empty slice is sent as [] to clear the paths.
+	AllowDeployPaths  []string          `json:"allow_deploy_paths,omitzero"`
+	IgnoreDeployPaths []string          `json:"ignore_deploy_paths,omitzero"`
+	Buildpacks        []BuildpackConfig `json:"buildpacks,omitempty"`
+	Source            *string           `json:"source,omitempty"`
+	GitType           *string           `json:"git_type,omitempty"`
+	RepoURL           *string           `json:"repo_url,omitempty"`
+	DockerImage       *string           `json:"docker_image,omitempty"`
 }
 
 type TriggerDeploymentRequest struct {
-	IsRestart bool `json:"is_restart"`
+	Branch         *string `json:"branch,omitempty"`
+	CommitSHA      *string `json:"commit_sha,omitempty"`
+	DockerImage    *string `json:"docker_image,omitempty"`
+	IsRestart      bool    `json:"is_restart"`
+	SkipBuildCache bool    `json:"skip_build_cache,omitempty"`
 }
 
-type TriggerDeploymentResponse struct {
-	ID string `json:"id"`
+type Deployment struct {
+	ID     string  `json:"id"`
+	Status *string `json:"status"`
 }
 
 type ApplicationListItem struct {
@@ -125,6 +151,7 @@ type Cluster struct {
 	Name        string  `json:"name"`
 	DisplayName *string `json:"display_name"`
 	Location    string  `json:"location"`
+	Provider    string  `json:"provider"`
 }
 
 type ProcessResourceType struct {
@@ -141,6 +168,4 @@ type DatabaseResourceType struct {
 	CPULimit     int64  `json:"cpu_limit"`
 	MemoryLimit  int64  `json:"memory_limit"`
 	StorageLimit int64  `json:"storage_limit"`
-	Category     string `json:"category"`
 }
-

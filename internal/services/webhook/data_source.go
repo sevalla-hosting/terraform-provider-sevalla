@@ -67,11 +67,11 @@ func (d *webhookDataSource) Schema(_ context.Context, _ datasource.SchemaRequest
 				Computed:    true,
 			},
 			"created_by": schema.StringAttribute{
-				Description: "The user who created the webhook.",
+				Description: "The identifier of the API key that created the webhook.",
 				Computed:    true,
 			},
 			"updated_by": schema.StringAttribute{
-				Description: "The user who last updated the webhook.",
+				Description: "The identifier of the API key that last updated the webhook.",
 				Computed:    true,
 			},
 			"company_id": schema.StringAttribute{

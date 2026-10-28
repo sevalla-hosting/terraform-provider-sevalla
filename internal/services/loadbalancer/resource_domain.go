@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/writeonly"
 )
 
 var (
@@ -35,6 +39,7 @@ type LoadBalancerDomainResourceModel struct {
 	IsPrimary      types.Bool   `tfsdk:"is_primary"`
 	IsEnabled      types.Bool   `tfsdk:"is_enabled"`
 	Status         types.String `tfsdk:"status"`
+	DNSRecords     types.String `tfsdk:"dns_records"`
 	CreatedAt      types.String `tfsdk:"created_at"`
 	UpdatedAt      types.String `tfsdk:"updated_at"`
 }
@@ -68,26 +73,40 @@ func (r *loadBalancerDomainResource) Schema(_ context.Context, _ resource.Schema
 			"name": schema.StringAttribute{
 				Description: "The domain name.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"is_wildcard": schema.BoolAttribute{
-				Description: "Whether this should be a wildcard domain that matches all subdomains.",
+				Description: "Whether the domain is a wildcard domain that matches all subdomains. Defaults to `false`. Changing this creates a new domain.",
 				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+					boolplanmodifier.RequiresReplaceIfConfigured(),
+				},
 			},
 			"custom_ssl_cert": schema.StringAttribute{
-				Description: "Custom SSL certificate in PEM format. When provided, the platform uses this certificate instead of auto-provisioning one.",
+				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_key"))},
+				PlanModifiers: []planmodifier.String{
+					writeonly.RequiresReplace(),
+				},
 			},
 			"custom_ssl_key": schema.StringAttribute{
-				Description: "Private key for the custom SSL certificate in PEM format. Required when custom_ssl_cert is provided.",
+				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.",
 				Optional:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_cert"))},
+				PlanModifiers: []planmodifier.String{
+					writeonly.RequiresReplace(),
+				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The domain type (custom or system).",
+				Description: "The domain type: `CUSTOM` for user-added domains or `SYSTEM` for platform-assigned ones.",
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
@@ -102,7 +121,11 @@ func (r *loadBalancerDomainResource) Schema(_ context.Context, _ resource.Schema
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "The status of the domain.",
+				Description: "The verification status: `VERIFICATION`, `POINTING`, `ACTIVE` or `TIMED_OUT`.",
+				Computed:    true,
+			},
+			"dns_records": schema.StringAttribute{
+				Description: "JSON-encoded DNS records to create for the domain (e.g. `[{\"type\":\"CNAME\",\"name\":\"app.example.com\",\"value\":\"...\"}]`), or null when none are needed. Decode it with `jsondecode()`.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -192,11 +215,22 @@ func (r *loadBalancerDomainResource) Read(ctx context.Context, req resource.Read
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *loadBalancerDomainResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Load balancer domains cannot be updated. Delete and recreate the domain instead.",
-	)
+// Update is only reached when custom_ssl_cert or custom_ssl_key is first set
+// after an import. The API never returns them, so they are only recorded, with
+// a warning.
+func (r *loadBalancerDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state LoadBalancerDomainResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	if !plan.CustomSSLCert.IsNull() && state.CustomSSLCert.IsNull() {
+		writeonly.WarnRecorded(&resp.Diagnostics, path.Root("custom_ssl_cert"), "domain")
+	}
+	state.CustomSSLCert = plan.CustomSSLCert
+	state.CustomSSLKey = plan.CustomSSLKey
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *loadBalancerDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -207,7 +241,7 @@ func (r *loadBalancerDomainResource) Delete(ctx context.Context, req resource.De
 	}
 
 	err := r.client.DeleteDomain(ctx, "/load-balancers", state.LoadBalancerID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Load Balancer Domain", err.Error())
 		return
 	}
@@ -225,11 +259,15 @@ func (r *loadBalancerDomainResource) ImportState(ctx context.Context, req resour
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("load_balancer_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+	resp.Diagnostics.Append(writeonly.MarkImported(ctx, resp.Private)...)
 }
 
 func flattenLBDomain(domain *client.Domain, model *LoadBalancerDomainResourceModel) {
 	model.ID = types.StringValue(domain.ID)
-	model.Name = types.StringValue(domain.Name)
+	// Keep the configured spelling when the API only changes the case.
+	if !strings.EqualFold(model.Name.ValueString(), domain.Name) {
+		model.Name = types.StringValue(domain.Name)
+	}
 	model.IsWildcard = types.BoolValue(domain.IsWildcard)
 	model.Type = types.StringValue(domain.Type)
 	model.IsPrimary = types.BoolValue(domain.IsPrimary)
@@ -241,4 +279,8 @@ func flattenLBDomain(domain *client.Domain, model *LoadBalancerDomainResourceMod
 	}
 	model.CreatedAt = types.StringValue(domain.CreatedAt)
 	model.UpdatedAt = types.StringValue(domain.UpdatedAt)
+	model.DNSRecords = types.StringNull()
+	if domain.DnsRecords != nil && string(*domain.DnsRecords) != "null" {
+		model.DNSRecords = types.StringValue(string(*domain.DnsRecords))
+	}
 }

@@ -62,16 +62,17 @@ func (d *databaseResourceTypesDataSource) Schema(_ context.Context, _ datasource
 							Computed:    true,
 						},
 						"memory_limit": schema.Int64Attribute{
-							Description: "The memory limit in bytes.",
+							Description: "The memory limit in megabytes.",
 							Computed:    true,
 						},
 						"storage_limit": schema.Int64Attribute{
-							Description: "The storage limit in bytes.",
+							Description: "The storage limit in megabytes.",
 							Computed:    true,
 						},
 						"category": schema.StringAttribute{
-							Description: "The category of the database resource type.",
-							Computed:    true,
+							Description:        "Always null. The Sevalla API no longer returns a category for database resource types.",
+							DeprecationMessage: "The Sevalla API no longer returns a category for database resource types. This attribute is always null and will be removed in a future major version.",
+							Computed:           true,
 						},
 					},
 				},
@@ -117,7 +118,7 @@ func (d *databaseResourceTypesDataSource) Read(ctx context.Context, _ datasource
 			CPULimit:     types.Int64Value(rt.CPULimit),
 			MemoryLimit:  types.Int64Value(rt.MemoryLimit),
 			StorageLimit: types.Int64Value(rt.StorageLimit),
-			Category:     types.StringValue(rt.Category),
+			Category:     types.StringNull(),
 		}
 	}
 

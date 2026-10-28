@@ -20,7 +20,7 @@ func TestAccAPIKey_basic(t *testing.T) {
 		PreCheck:                 func() { testutil.TestAccPreCheck(t) },
 		ProtoV6ProviderFactories: testutil.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
-			// Step 1: Create with name only
+			// Step 1: Create with a role
 			{
 				Config: testAccAPIKeyConfig(rName),
 				Check: resource.ComposeAggregateTestCheckFunc(
@@ -39,7 +39,7 @@ func TestAccAPIKey_basic(t *testing.T) {
 				ResourceName:            resourceName,
 				ImportState:             true,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"token", "role_ids"},
+				ImportStateVerifyIgnore: []string{"token"},
 			},
 			// Step 3: Update name
 			{

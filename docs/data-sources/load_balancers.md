@@ -32,12 +32,11 @@ output "load_balancer_names" {
 
 Read-Only:
 
-- `algorithm` (String) The load balancing algorithm.
+- `company_id` (String) The company ID that owns the load balancer.
 - `created_at` (String) When the load balancer was created.
 - `display_name` (String) The display name of the load balancer.
 - `id` (String) The unique identifier of the load balancer.
 - `name` (String) The system-generated name of the load balancer.
-- `port` (Number) The port the load balancer listens on.
-- `protocol` (String) The protocol for the load balancer.
-- `status` (String) The current status of the load balancer.
+- `project_id` (String) The ID of the project the load balancer is grouped under.
+- `type` (String) The routing type.
 - `updated_at` (String) When the load balancer was last updated.

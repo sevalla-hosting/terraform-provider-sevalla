@@ -31,7 +31,7 @@ output "endpoint" {
 
 ### Read-Only
 
-- `access_key` (String, Sensitive) The access key for S3-compatible API authentication.
+- `access_key` (String, Sensitive) Always null: the API only returns the access key when the bucket is created.
 - `bucket_name` (String) The bucket name.
 - `company_id` (String) The company ID that owns the object storage.
 - `created_at` (String) When the object storage was created.
@@ -42,5 +42,7 @@ output "endpoint" {
 - `location` (String) Geographic hint for where most data access occurs.
 - `name` (String) The system-generated name of the object storage.
 - `project_id` (String) The project this bucket is grouped under.
-- `secret_key` (String, Sensitive) The secret key for S3-compatible API authentication.
+- `public_access` (Boolean) Whether a public CDN domain is enabled for this bucket.
+- `secret_key` (String, Sensitive) Always null: the API only returns the secret key when the bucket is created.
+- `status` (String) The lifecycle status of the bucket: `active`, `deleting` or `deletionFailed`.
 - `updated_at` (String) When the object storage was last updated.

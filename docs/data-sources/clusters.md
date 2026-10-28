@@ -34,5 +34,6 @@ Read-Only:
 
 - `display_name` (String) The display name of the cluster.
 - `id` (String) The unique identifier of the cluster.
-- `location` (String) The geographic location of the cluster.
+- `location` (String) The cloud region where the cluster is located.
 - `name` (String) The system name of the cluster.
+- `provider` (String) The cloud provider running the cluster: `gcp` (Google Cloud Platform) or `oci` (Oracle Cloud Infrastructure).

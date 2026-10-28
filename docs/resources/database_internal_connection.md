@@ -3,21 +3,21 @@
 page_title: "sevalla_database_internal_connection Resource - Sevalla"
 subcategory: ""
 description: |-
-  Manages an internal connection between a Sevalla database and an application.
+  Manages an internal connection between a Sevalla database and another resource.
 ---
 
 # sevalla_database_internal_connection (Resource)
 
-Manages an internal connection between a Sevalla database and an application.
+Manages an internal connection between a Sevalla database and another resource.
 
 ## Example Usage
 
 ```terraform
 # Connect a database to an application
 resource "sevalla_database_internal_connection" "example" {
-  database_id    = sevalla_database.postgres.id
-  application_id = sevalla_application.example.id
-  target_type    = "app"
+  database_id = sevalla_database.postgres.id
+  target_id   = sevalla_application.example.id
+  target_type = "app"
 }
 ```
 
@@ -26,12 +26,9 @@ resource "sevalla_database_internal_connection" "example" {
 
 ### Required
 
-- `application_id` (String) The ID of the application to connect.
-- `database_id` (String) The ID of the database.
-
-### Optional
-
-- `target_type` (String) The type of service to connect. Valid values: app, database.
+- `database_id` (String) The ID of the source database.
+- `target_id` (String) The ID of the target resource to connect.
+- `target_type` (String) The type of the target resource. Valid values: `app`, `database`.
 
 ### Read-Only
 

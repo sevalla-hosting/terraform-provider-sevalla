@@ -1,11 +1,11 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -28,6 +28,7 @@ type Database struct {
 	MemoryLimit        *int64  `json:"memory_limit"`
 	StorageSize        *int64  `json:"storage_size"`
 	DbName             *string `json:"db_name"`
+	DbUser             *string `json:"db_user"`
 	InternalHostname   *string `json:"internal_hostname"`
 	InternalPort       *string `json:"internal_port"`
 	ExternalHostname   *string `json:"external_hostname"`
@@ -56,20 +57,22 @@ type CreateDatabaseRequest struct {
 }
 
 type UpdateDatabaseRequest struct {
-	DisplayName    *string `json:"display_name,omitempty"`
-	ResourceTypeID *string `json:"resource_type_id,omitempty"`
-	ProjectID      *string `json:"project_id,omitempty"`
+	DisplayName    *string          `json:"display_name,omitempty"`
+	ResourceTypeID *string          `json:"resource_type_id,omitempty"`
+	ProjectID      Nullable[string] `json:"project_id,omitzero"`
 }
 
 type DatabaseListItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	DisplayName string  `json:"display_name"`
-	Type        string  `json:"type"`
-	Status      *string `json:"status"`
-	IsSuspended bool    `json:"is_suspended"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	DisplayName      string  `json:"display_name"`
+	Type             string  `json:"type"`
+	Version          string  `json:"version"`
+	ResourceTypeName *string `json:"resource_type_name"`
+	Status           *string `json:"status"`
+	IsSuspended      bool    `json:"is_suspended"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 type InternalConnection struct {
@@ -95,41 +98,31 @@ type IPRestriction struct {
 	IPList    []string `json:"ip_list"`
 }
 
-// WaitForDatabaseStatus polls the database until it reaches one of the target statuses.
-// It polls every 2 seconds for up to maxWait duration.
+// WaitForDatabaseStatus polls the database until it reaches one of the target
+// statuses, and fails when it reaches error or a *Failed status instead.
 func (c *SevallaClient) WaitForDatabaseStatus(ctx context.Context, id string, targetStatuses []string, maxWait time.Duration) (*Database, error) {
-	deadline := time.Now().Add(maxWait)
-	for {
-		db, err := c.GetDatabase(ctx, id)
-		if err != nil {
-			if IsNotFound(err) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("polling database status: %w", err)
+	var db *Database
+	err := Poll(ctx, maxWait, func() (bool, error) {
+		var err error
+		if db, err = c.GetDatabase(ctx, id); err != nil {
+			return false, err
 		}
-
+		status := ""
 		if db.Status != nil {
-			for _, s := range targetStatuses {
-				if *db.Status == s {
-					return db, nil
-				}
-			}
+			status = *db.Status
 		}
-
-		if time.Now().After(deadline) {
-			currentStatus := "<nil>"
-			if db.Status != nil {
-				currentStatus = *db.Status
-			}
-			return nil, fmt.Errorf("database %s did not reach status %v within %s (current: %s)", id, targetStatuses, maxWait, currentStatus)
+		switch {
+		case slices.Contains(targetStatuses, status):
+			return true, nil
+		case status == "error" || strings.HasSuffix(status, "Failed"):
+			return false, fmt.Errorf("database %s is in the %s state", id, status)
 		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return db, nil
 }
 
 func (c *SevallaClient) ListDatabases(ctx context.Context) ([]DatabaseListItem, error) {
@@ -137,284 +130,70 @@ func (c *SevallaClient) ListDatabases(ctx context.Context) ([]DatabaseListItem, 
 }
 
 func (c *SevallaClient) GetDatabase(ctx context.Context, id string) (*Database, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/databases/%s", id), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
 	var db Database
-	if err := json.NewDecoder(resp.Body).Decode(&db); err != nil {
-		return nil, fmt.Errorf("decoding database response: %w", err)
+	if err := c.do(ctx, http.MethodGet, path("/databases/%s", id), nil, &db); err != nil {
+		return nil, err
 	}
-
 	return &db, nil
 }
 
+// CreateDatabase returns a partial database; poll GetDatabase for the full state.
 func (c *SevallaClient) CreateDatabase(ctx context.Context, input *CreateDatabaseRequest) (*Database, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create database request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/databases"), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
 	var db Database
-	if err := json.NewDecoder(resp.Body).Decode(&db); err != nil {
-		return nil, fmt.Errorf("decoding database response: %w", err)
+	if err := c.do(ctx, http.MethodPost, "/databases", input, &db); err != nil {
+		return nil, err
 	}
-
 	return &db, nil
 }
 
 func (c *SevallaClient) UpdateDatabase(ctx context.Context, id string, input *UpdateDatabaseRequest) (*Database, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update database request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.url("/databases/%s", id), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
 	var db Database
-	if err := json.NewDecoder(resp.Body).Decode(&db); err != nil {
-		return nil, fmt.Errorf("decoding database response: %w", err)
+	if err := c.do(ctx, http.MethodPatch, path("/databases/%s", id), input, &db); err != nil {
+		return nil, err
 	}
-
 	return &db, nil
 }
 
 func (c *SevallaClient) DeleteDatabase(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/databases/%s", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/databases/%s", id), nil, nil)
 }
 
-func (c *SevallaClient) SuspendDatabase(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/databases/%s/suspend", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
-}
-
-func (c *SevallaClient) ActivateDatabase(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/databases/%s/activate", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
-}
-
-func (c *SevallaClient) ToggleExternalConnection(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/databases/%s/external-connection/toggle", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+// ResetDatabasePassword changes the password of the database user.
+func (c *SevallaClient) ResetDatabasePassword(ctx context.Context, id string, newPassword string) error {
+	return c.do(ctx, http.MethodPost, path("/databases/%s/reset-password", id), map[string]string{"new_password": newPassword}, nil)
 }
 
 func (c *SevallaClient) ListInternalConnections(ctx context.Context, dbID string) ([]InternalConnection, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/databases/%s/internal-connections", dbID), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var connections []InternalConnection
-	if err := json.NewDecoder(resp.Body).Decode(&connections); err != nil {
-		return nil, fmt.Errorf("decoding internal connections response: %w", err)
-	}
-
-	return connections, nil
+	var out []InternalConnection
+	err := c.do(ctx, http.MethodGet, path("/databases/%s/internal-connections", dbID), nil, &out)
+	return out, err
 }
 
+// CreateInternalConnection returns only the new connection's ID.
 func (c *SevallaClient) CreateInternalConnection(ctx context.Context, dbID string, input *CreateInternalConnectionRequest) (*InternalConnection, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create internal connection request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/databases/%s/internal-connections", dbID), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
 	var conn InternalConnection
-	if err := json.NewDecoder(resp.Body).Decode(&conn); err != nil {
-		return nil, fmt.Errorf("decoding internal connection response: %w", err)
+	if err := c.do(ctx, http.MethodPost, path("/databases/%s/internal-connections", dbID), input, &conn); err != nil {
+		return nil, err
 	}
-
 	return &conn, nil
 }
 
 func (c *SevallaClient) DeleteInternalConnection(ctx context.Context, dbID string, connID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/databases/%s/internal-connections/%s", dbID, connID), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/databases/%s/internal-connections/%s", dbID, connID), nil, nil)
 }
 
 func (c *SevallaClient) GetDatabaseIPRestriction(ctx context.Context, dbID string) (*IPRestriction, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/databases/%s/ip-restriction", dbID), nil)
-	if err != nil {
+	var out IPRestriction
+	if err := c.do(ctx, http.MethodGet, path("/databases/%s/ip-restriction", dbID), nil, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var restriction IPRestriction
-	if err := json.NewDecoder(resp.Body).Decode(&restriction); err != nil {
-		return nil, fmt.Errorf("decoding ip restriction response: %w", err)
-	}
-
-	return &restriction, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) UpdateDatabaseIPRestriction(ctx context.Context, dbID string, input *IPRestriction) (*IPRestriction, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update ip restriction request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.url("/databases/%s/ip-restriction", dbID), bytes.NewReader(body))
-	if err != nil {
+	var out IPRestriction
+	if err := c.do(ctx, http.MethodPut, path("/databases/%s/ip-restriction", dbID), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var restriction IPRestriction
-	if err := json.NewDecoder(resp.Body).Decode(&restriction); err != nil {
-		return nil, fmt.Errorf("decoding ip restriction response: %w", err)
-	}
-
-	return &restriction, nil
+	return &out, nil
 }

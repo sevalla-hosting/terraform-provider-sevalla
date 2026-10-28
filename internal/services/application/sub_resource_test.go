@@ -51,11 +51,10 @@ func TestAccApplicationEnvironmentVariable_basic(t *testing.T) {
 			},
 			// Step 2: Import
 			{
-				ResourceName:            resourceName,
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"value"},
-				ImportStateIdFunc:       testAccApplicationSubResourceImportStateIdFunc(resourceName, "application_id", "id"),
+				ResourceName:      resourceName,
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateIdFunc: testAccApplicationSubResourceImportStateIdFunc(resourceName, "application_id", "id"),
 			},
 			// Step 3: Update value
 			{
@@ -151,7 +150,6 @@ func TestAccApplicationDeploymentHook_basic(t *testing.T) {
 				ResourceName:                         resourceName,
 				ImportState:                          true,
 				ImportStateVerify:                    true,
-				ImportStateVerifyIgnore:              []string{"url"},
 				ImportStateVerifyIdentifierAttribute: "application_id",
 				ImportStateIdFunc:                    testAccApplicationDeploymentHookImportStateIdFunc(resourceName),
 			},

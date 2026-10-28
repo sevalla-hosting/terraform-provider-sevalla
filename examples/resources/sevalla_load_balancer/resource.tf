@@ -1,18 +1,10 @@
-# Standard load balancer
+# Load balancer with round-robin or weighted routing
 resource "sevalla_load_balancer" "example" {
   display_name = "my-load-balancer"
-  cluster_id   = data.sevalla_clusters.all.clusters[0].id
-  port         = 443
-  protocol     = "HTTPS"
-  algorithm    = "round-robin"
 }
 
-# Geo-routed load balancer
+# Load balancer that routes by client location
 resource "sevalla_load_balancer" "geo" {
   display_name = "my-geo-lb"
-  cluster_id   = data.sevalla_clusters.all.clusters[0].id
-  port         = 443
-  protocol     = "HTTPS"
-  algorithm    = "round-robin"
   type         = "GEO"
 }

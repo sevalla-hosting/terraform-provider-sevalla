@@ -13,18 +13,25 @@ Manages a stage within a Sevalla pipeline.
 ## Example Usage
 
 ```terraform
-# Staging stage
+# A new pipeline has a Dev (0) and a Production (1) stage.
+# Insert a staging stage between them.
 resource "sevalla_pipeline_stage" "staging" {
-  pipeline_id = sevalla_pipeline.example.id
-  name        = "staging"
-  branch      = "develop"
+  pipeline_id   = sevalla_pipeline.example.id
+  name          = "staging"
+  insert_before = 1
 }
 
-# Production stage inserted after staging
-resource "sevalla_pipeline_stage" "production" {
-  pipeline_id   = sevalla_pipeline.example.id
-  name          = "production"
-  insert_before = 2
+# In a branch pipeline, each stage can deploy its own branch.
+resource "sevalla_pipeline" "feature" {
+  display_name = "feature-pipeline"
+  type         = "branch"
+}
+
+resource "sevalla_pipeline_stage" "qa" {
+  pipeline_id   = sevalla_pipeline.feature.id
+  name          = "qa"
+  insert_before = 1
+  branch        = "develop"
 }
 ```
 
@@ -33,18 +40,21 @@ resource "sevalla_pipeline_stage" "production" {
 
 ### Required
 
-- `name` (String) The name of the pipeline stage.
+- `insert_before` (Number) Position to insert the stage at (0-50). Existing stages at this position and above are shifted up. Changing it creates a new stage, except after an import, when it is only recorded.
+- `name` (String) The name of the pipeline stage (1-255 characters).
 - `pipeline_id` (String) The ID of the pipeline this stage belongs to.
 
 ### Optional
 
-- `branch` (String) The branch for branch-type pipelines.
-- `insert_before` (Number) Position to insert the stage at. Existing stages at this position and above are shifted up.
+- `branch` (String) The Git branch of the stage, used in branch-type pipelines.
 
 ### Read-Only
 
+- `auto_create_app` (Boolean) Whether to automatically create applications when new branches are detected.
 - `created_at` (String) The timestamp when the stage was created.
+- `delete_stale_apps` (Boolean) Whether to automatically delete applications when their branches are removed.
 - `id` (String) The unique identifier of the pipeline stage.
-- `order` (Number) The stage order.
+- `order` (Number) The current position of the stage, starting from 0. It changes when other stages are added or removed.
+- `stale_app_days` (Number) Number of days after which an application is considered stale and eligible for deletion.
 - `type` (String) The stage type.
 - `updated_at` (String) The timestamp when the stage was last updated.

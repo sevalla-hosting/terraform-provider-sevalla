@@ -19,16 +19,16 @@ func TestGetObjectStorage_Success(t *testing.T) {
 		endpoint := "https://s3.example.com"
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(ObjectStorage{
-			ID:          "os-123",
-			Name:        "my-storage",
-			DisplayName: "My Storage",
-			Location:    "enam",
+			ID:           "os-123",
+			Name:         "my-storage",
+			DisplayName:  "My Storage",
+			Location:     "enam",
 			Jurisdiction: "default",
-			Endpoint:    &endpoint,
-			BucketName:  "my-bucket",
-			CompanyID:   "company-1",
-			CreatedAt:   "2025-01-01T00:00:00.000Z",
-			UpdatedAt:   "2025-01-01T00:00:00.000Z",
+			Endpoint:     &endpoint,
+			BucketName:   "my-bucket",
+			CompanyID:    "company-1",
+			CreatedAt:    "2025-01-01T00:00:00.000Z",
+			UpdatedAt:    "2025-01-01T00:00:00.000Z",
 		})
 	})
 	defer server.Close()
@@ -87,15 +87,15 @@ func TestCreateObjectStorage_Success(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(ObjectStorage{
-			ID:          "os-new",
-			Name:        "new-storage",
-			DisplayName: req.DisplayName,
-			Location:    "enam",
+			ID:           "os-new",
+			Name:         "new-storage",
+			DisplayName:  req.DisplayName,
+			Location:     "enam",
 			Jurisdiction: "default",
-			BucketName:  "new-storage",
-			CompanyID:   "company-1",
-			CreatedAt:   "2025-01-01T00:00:00.000Z",
-			UpdatedAt:   "2025-01-01T00:00:00.000Z",
+			BucketName:   "new-storage",
+			CompanyID:    "company-1",
+			CreatedAt:    "2025-01-01T00:00:00.000Z",
+			UpdatedAt:    "2025-01-01T00:00:00.000Z",
 		})
 	})
 	defer server.Close()
@@ -141,7 +141,7 @@ func TestCreateCORSPolicy_Success(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
-		var req CreateCORSPolicyRequest
+		var req CORSPolicyRequest
 		json.NewDecoder(r.Body).Decode(&req)
 
 		if len(req.AllowedOrigins) != 1 || req.AllowedOrigins[0] != "https://example.com" {
@@ -154,7 +154,7 @@ func TestCreateCORSPolicy_Success(t *testing.T) {
 	})
 	defer server.Close()
 
-	err := c.CreateCORSPolicy(context.Background(), "os-123", &CreateCORSPolicyRequest{
+	err := c.CreateCORSPolicy(context.Background(), "os-123", &CORSPolicyRequest{
 		AllowedOrigins: []string{"https://example.com"},
 		AllowedMethods: []string{"GET", "POST"},
 		AllowedHeaders: []string{"Content-Type"},

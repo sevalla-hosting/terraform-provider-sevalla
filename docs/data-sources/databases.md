@@ -37,6 +37,8 @@ Read-Only:
 - `id` (String) The unique identifier of the database.
 - `is_suspended` (Boolean) Whether the database is suspended.
 - `name` (String) The system-generated name of the database.
+- `resource_type_name` (String) The name of the resource type (size) of the database.
 - `status` (String) The current status of the database.
 - `type` (String) The database engine type.
 - `updated_at` (String) When the database was last updated.
+- `version` (String) The database engine version.

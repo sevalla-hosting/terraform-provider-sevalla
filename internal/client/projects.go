@@ -1,11 +1,9 @@
 package client
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type Project struct {
@@ -16,14 +14,6 @@ type Project struct {
 	Services    []ProjectService `json:"services"`
 	CreatedAt   string           `json:"created_at"`
 	UpdatedAt   string           `json:"updated_at"`
-}
-
-type ProjectListItem struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	DisplayName string `json:"display_name"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
 }
 
 type CreateProjectRequest struct {
@@ -46,155 +36,40 @@ type AddProjectServiceRequest struct {
 	ServiceType string `json:"service_type"`
 }
 
-func (c *SevallaClient) ListProjects(ctx context.Context) ([]ProjectListItem, error) {
-	return Paginate[ProjectListItem](ctx, c, "/projects")
-}
-
 func (c *SevallaClient) GetProject(ctx context.Context, id string) (*Project, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url("/projects/%s", id), nil)
-	if err != nil {
+	var out Project
+	if err := c.do(ctx, http.MethodGet, path("/projects/%s", id), nil, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var project Project
-	if err := json.NewDecoder(resp.Body).Decode(&project); err != nil {
-		return nil, fmt.Errorf("decoding project response: %w", err)
-	}
-
-	return &project, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) CreateProject(ctx context.Context, input *CreateProjectRequest) (*Project, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create project request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/projects"), bytes.NewReader(body))
-	if err != nil {
+	var out Project
+	if err := c.do(ctx, http.MethodPost, "/projects", input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var project Project
-	if err := json.NewDecoder(resp.Body).Decode(&project); err != nil {
-		return nil, fmt.Errorf("decoding project response: %w", err)
-	}
-
-	return &project, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) UpdateProject(ctx context.Context, id string, input *UpdateProjectRequest) (*Project, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update project request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, c.url("/projects/%s", id), bytes.NewReader(body))
-	if err != nil {
+	var out Project
+	if err := c.do(ctx, http.MethodPatch, path("/projects/%s", id), input, &out); err != nil {
 		return nil, err
 	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, parseErrorResponse(resp)
-	}
-
-	var project Project
-	if err := json.NewDecoder(resp.Body).Decode(&project); err != nil {
-		return nil, fmt.Errorf("decoding project response: %w", err)
-	}
-
-	return &project, nil
+	return &out, nil
 }
 
 func (c *SevallaClient) DeleteProject(ctx context.Context, id string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/projects/%s", id), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/projects/%s", id), nil, nil)
 }
 
+// AddProjectService adds a service to the project. Adding a pipeline also
+// moves the applications in its stages into the project.
 func (c *SevallaClient) AddProjectService(ctx context.Context, projectID string, input *AddProjectServiceRequest) error {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return fmt.Errorf("marshaling add project service request: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url("/projects/%s/services", projectID), bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodPost, path("/projects/%s/services", projectID), input, nil)
 }
-
 
 func (c *SevallaClient) RemoveProjectService(ctx context.Context, projectID string, serviceID string, serviceType string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.url("/projects/%s/services/%s", projectID, serviceID), nil)
-	if err != nil {
-		return err
-	}
-
-	q := req.URL.Query()
-	q.Set("service_type", serviceType)
-	req.URL.RawQuery = q.Encode()
-
-	resp, err := c.HTTPClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-		return parseErrorResponse(resp)
-	}
-
-	return nil
+	return c.do(ctx, http.MethodDelete, path("/projects/%s/services/%s", projectID, serviceID)+"?service_type="+url.QueryEscape(serviceType), nil, nil)
 }

@@ -3,18 +3,22 @@ package database
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/writeonly"
 )
 
-const databaseReadyTimeout = 5 * time.Minute
+const databaseReadyTimeout = 15 * time.Minute
 
 var (
 	_ resource.Resource                = &databaseResource{}
@@ -46,65 +50,69 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "The display name of the database.",
+				Description: "The display name of the database (2-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 64)},
 			},
 			"type": schema.StringAttribute{
-				Description: "The database engine type. Valid values: postgresql, mysql, redis, mariadb, valkey. Cannot be changed after creation.",
+				Description: "The database engine type. Valid values: `postgresql`, `mysql`, `mariadb`, `redis`, `valkey`. Changing this creates a new database.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("postgresql", "mysql", "mariadb", "redis", "valkey")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"version": schema.StringAttribute{
-				Description: "The database engine version. Cannot be changed after creation.",
+				Description: "The database engine version. The available versions depend on the type and cluster. Changing this creates a new database.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"cluster_id": schema.StringAttribute{
-				Description: "The cluster where the database is deployed. Cannot be changed after creation.",
+				Description: "The cluster where the database is deployed. Changing this creates a new database.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"resource_type_id": schema.StringAttribute{
-				Description: "The resource type (size) of the database. Can be changed to resize.",
+				Description: "The resource type (size) of the database. Changing it resizes the database in place; on OCI clusters, resizing a DB1 database deletes its backups.",
 				Required:    true,
 			},
 			"db_name": schema.StringAttribute{
-				Description: "The database name. Cannot be changed after creation.",
+				Description: "The name of the database to create (2-100 characters). Redis and Valkey ignore it. Changing this creates a new database, except for Redis and Valkey.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 100)},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					requiresReplaceUnlessKeyValue(),
 				},
 			},
 			"db_password": schema.StringAttribute{
-				Description: "The database password. Cannot be changed after creation.",
+				Description: "The password of the database user (4-100 characters). Changing it resets the password in place. The API never returns it, so after an import the configured value is recorded without being applied.",
 				Required:    true,
 				Sensitive:   true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
-				},
+				Validators:  []validator.String{stringvalidator.LengthBetween(4, 100)},
 			},
 			"db_user": schema.StringAttribute{
-				Description: "The database user. Cannot be \"root\" or \"postgres\". If omitted, the database engine default user is used. Cannot be changed after creation.",
+				Description: "The database user (2-32 characters, not `root` or `postgres`). Defaults to the engine's default user. Redis and Valkey ignore it. Changing this creates a new database, except for Redis and Valkey.",
 				Optional:    true,
+				Computed:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 32)},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					stringplanmodifier.UseStateForUnknown(),
+					requiresReplaceUnlessKeyValue(),
 				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The project ID to associate with this database.",
+				Description: "The ID of the project to group the database under. Removing it removes the database from the project.",
 				Optional:    true,
 			},
 			"extensions": schema.SingleNestedAttribute{
-				Description: "PostgreSQL extensions to enable. Only applicable when type is postgresql. Cannot be changed after creation.",
+				Description: "PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing them creates a new database. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the database does not already use them.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplace(),
+					writeonly.RequiresReplaceObject(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"enable_vector": schema.BoolAttribute{
@@ -149,15 +157,15 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Computed:    true,
 			},
 			"cpu_limit": schema.Int64Attribute{
-				Description: "The CPU limit for the database.",
+				Description: "The CPU limit for the database in millicores.",
 				Computed:    true,
 			},
 			"memory_limit": schema.Int64Attribute{
-				Description: "The memory limit for the database in bytes.",
+				Description: "The memory limit for the database in megabytes.",
 				Computed:    true,
 			},
 			"storage_size": schema.Int64Attribute{
-				Description: "The storage size for the database in bytes.",
+				Description: "The storage size for the database in megabytes.",
 				Computed:    true,
 			},
 			"internal_hostname": schema.StringAttribute{
@@ -223,9 +231,7 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		return
 	}
 
-	createReq := buildCreateRequest(&plan)
-
-	createResult, err := r.client.CreateDatabase(ctx, createReq)
+	createResult, err := r.client.CreateDatabase(ctx, buildCreateRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Database",
@@ -233,8 +239,9 @@ func (r *databaseResource) Create(ctx context.Context, req resource.CreateReques
 		)
 		return
 	}
+	// Save the ID first so a failure below leaves a tainted resource instead of an orphan.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), createResult.ID)...)
 
-	// Wait for the database to reach ready status before reading.
 	db, err := r.client.WaitForDatabaseStatus(ctx, createResult.ID, []string{"ready"}, databaseReadyTimeout)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -292,29 +299,52 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	}
 
 	dbID := state.ID.ValueString()
-
-	// Database must be in a ready state before it can be updated.
-	_, err := r.client.WaitForDatabaseStatus(ctx, dbID, []string{"ready"}, databaseReadyTimeout)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Waiting for Database Ready Before Update",
-			"Database "+dbID+" did not become ready: "+err.Error(),
-		)
-		return
-	}
-
 	updateReq := buildUpdateRequest(&plan, &state)
+	// The API never returns the password, so a null state value (e.g. after an import) is only recorded.
+	resetPassword := !state.DbPassword.IsNull() && !plan.DbPassword.Equal(state.DbPassword)
 
-	_, err = r.client.UpdateDatabase(ctx, dbID, updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating Database",
-			"Could not update database ID "+dbID+": "+err.Error(),
-		)
-		return
+	if resetPassword || !reflect.ValueOf(*updateReq).IsZero() {
+		// Wait for any operation in progress to finish. A failed one (e.g. a
+		// password reset) must not block the change that retries it.
+		if _, err := r.client.WaitForDatabaseStatus(ctx, dbID, idleStatuses, databaseReadyTimeout); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Waiting for Database Ready Before Update",
+				"Database "+dbID+" did not become ready: "+err.Error(),
+			)
+			return
+		}
 	}
 
-	// Update response may be incomplete — do a GET to retrieve the full object.
+	if !reflect.ValueOf(*updateReq).IsZero() {
+		if _, err := r.client.UpdateDatabase(ctx, dbID, updateReq); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Database",
+				"Could not update database ID "+dbID+": "+err.Error(),
+			)
+			return
+		}
+		// Resizing runs asynchronously.
+		if _, err := r.client.WaitForDatabaseStatus(ctx, dbID, []string{"ready"}, databaseReadyTimeout); err != nil {
+			resp.Diagnostics.AddError("Error Waiting for Database Update", "Database "+dbID+" did not become ready: "+err.Error())
+			return
+		}
+	}
+
+	if resetPassword {
+		if err := r.client.ResetDatabasePassword(ctx, dbID, plan.DbPassword.ValueString()); err != nil {
+			resp.Diagnostics.AddError("Error Updating Database", "Could not reset the password of database ID "+dbID+": "+err.Error())
+			return
+		}
+		if _, err := r.client.WaitForDatabaseStatus(ctx, dbID, []string{"ready"}, databaseReadyTimeout); err != nil {
+			resp.Diagnostics.AddError("Error Waiting for Database Password Reset", "Database "+dbID+" did not become ready: "+err.Error())
+			return
+		}
+	}
+
+	if !plan.Extensions.IsNull() && state.Extensions.IsNull() {
+		writeonly.WarnRecorded(&resp.Diagnostics, path.Root("extensions"), "database")
+	}
+
 	db, err := r.client.GetDatabase(ctx, dbID)
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -341,8 +371,8 @@ func (r *databaseResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	dbID := state.ID.ValueString()
 
-	// Database must be in a ready state before it can be deleted.
-	_, err := r.client.WaitForDatabaseStatus(ctx, dbID, []string{"ready", "error", "suspended"}, databaseReadyTimeout)
+	// Wait for any operation in progress to finish before deleting.
+	_, err := r.client.WaitForDatabaseStatus(ctx, dbID, idleStatuses, databaseReadyTimeout)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return
@@ -356,14 +386,49 @@ func (r *databaseResource) Delete(ctx context.Context, req resource.DeleteReques
 
 	err = r.client.DeleteDatabase(ctx, dbID)
 	if err != nil {
+		if client.IsNotFound(err) {
+			return
+		}
 		resp.Diagnostics.AddError(
 			"Error Deleting Database",
 			"Could not delete database ID "+dbID+": "+err.Error(),
 		)
 		return
 	}
+
+	err = client.Poll(ctx, databaseReadyTimeout, func() (bool, error) {
+		db, err := r.client.GetDatabase(ctx, dbID)
+		if client.IsNotFound(err) {
+			return true, nil
+		}
+		if err == nil && db.Status != nil && *db.Status == "dbDeletionFailed" {
+			err = fmt.Errorf("deletion of database %s failed", dbID)
+		}
+		return false, err
+	})
+	if err != nil {
+		resp.Diagnostics.AddError("Error Waiting for Database Deletion", err.Error())
+	}
 }
+
+// requiresReplaceUnlessKeyValue forces replacement when the value changes,
+// except for Redis and Valkey, which ignore db_name and db_user.
+func requiresReplaceUnlessKeyValue() planmodifier.String {
+	return stringplanmodifier.RequiresReplaceIf(func(ctx context.Context, req planmodifier.StringRequest, resp *stringplanmodifier.RequiresReplaceIfFuncResponse) {
+		var dbType types.String
+		resp.Diagnostics.Append(req.Plan.GetAttribute(ctx, path.Root("type"), &dbType)...)
+		resp.RequiresReplace = !isKeyValueStore(dbType.ValueString())
+	}, "Changing this creates a new database, except for Redis and Valkey.", "Changing this creates a new database, except for Redis and Valkey.")
+}
+
+func isKeyValueStore(dbType string) bool {
+	return dbType == "redis" || dbType == "valkey"
+}
+
+// idleStatuses are the statuses in which no operation is in progress.
+var idleStatuses = []string{"ready", "error", "passwordChangeFailed", "dbDeletionFailed", "restoringFailed"}
 
 func (r *databaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resp.Diagnostics.Append(writeonly.MarkImported(ctx, resp.Private)...)
 }

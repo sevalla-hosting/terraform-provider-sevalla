@@ -32,9 +32,9 @@ output "database_resource_type_names" {
 
 Read-Only:
 
-- `category` (String) The category of the database resource type.
+- `category` (String, Deprecated) Always null. The Sevalla API no longer returns a category for database resource types.
 - `cpu_limit` (Number) The CPU limit in millicores.
 - `id` (String) The unique identifier of the database resource type.
-- `memory_limit` (Number) The memory limit in bytes.
+- `memory_limit` (Number) The memory limit in megabytes.
 - `name` (String) The name of the database resource type.
-- `storage_limit` (Number) The storage limit in bytes.
+- `storage_limit` (Number) The storage limit in megabytes.

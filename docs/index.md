@@ -43,4 +43,4 @@ provider "sevalla" {
 
 ### Optional
 
-- `api_key` (String, Sensitive) Sevalla API key. Can also be set via the SEVALLA_API_KEY environment variable.
+- `api_key` (String, Sensitive) Sevalla API key. Can also be set with the `SEVALLA_API_KEY` environment variable.

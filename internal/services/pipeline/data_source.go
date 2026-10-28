@@ -50,6 +50,30 @@ func (d *pipelineDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Description: "The company ID that owns the pipeline.",
 				Computed:    true,
 			},
+			"stages": schema.ListNestedAttribute{
+				Description: "The stages of the pipeline ordered by position, including the Dev and Production stages the API creates with the pipeline.",
+				Computed:    true,
+				NestedObject: schema.NestedAttributeObject{
+					Attributes: map[string]schema.Attribute{
+						"id": schema.StringAttribute{
+							Description: "The unique identifier of the stage.",
+							Computed:    true,
+						},
+						"display_name": schema.StringAttribute{
+							Description: "The display name of the stage.",
+							Computed:    true,
+						},
+						"type": schema.StringAttribute{
+							Description: "The stage type: `standard`, `prod` or `preview`.",
+							Computed:    true,
+						},
+						"order": schema.Int64Attribute{
+							Description: "The position of the stage, starting from 0.",
+							Computed:    true,
+						},
+					},
+				},
+			},
 			"created_at": schema.StringAttribute{
 				Description: "When the pipeline was created.",
 				Computed:    true,
@@ -95,7 +119,7 @@ func (d *pipelineDataSource) Read(ctx context.Context, req datasource.ReadReques
 		return
 	}
 
-	flattenPipeline(pipeline, &model)
+	resp.Diagnostics.Append(flattenPipeline(ctx, pipeline, &model)...)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &model)...)
 }

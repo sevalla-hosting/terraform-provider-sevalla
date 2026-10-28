@@ -4,6 +4,7 @@ resource "sevalla_static_site" "example" {
   repo_url       = "https://github.com/example/docs"
   default_branch = "main"
   build_command  = "npm run build"
+  node_version   = "lts"
 }
 
 # Static site from a private GitHub repository

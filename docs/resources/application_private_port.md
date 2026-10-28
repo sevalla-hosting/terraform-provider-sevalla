@@ -3,12 +3,12 @@
 page_title: "sevalla_application_private_port Resource - Sevalla"
 subcategory: ""
 description: |-
-  Manages a private port for a Sevalla application.
+  Manages a private port that exposes a port of a Sevalla application process inside the cluster.
 ---
 
 # sevalla_application_private_port (Resource)
 
-Manages a private port for a Sevalla application.
+Manages a private port that exposes a port of a Sevalla application process inside the cluster.
 
 ## Example Usage
 
@@ -17,7 +17,6 @@ resource "sevalla_application_private_port" "example" {
   application_id = sevalla_application.example.id
   process_id     = sevalla_application_process.web.id
   port           = 3000
-  protocol       = "TCP"
 }
 ```
 
@@ -27,13 +26,12 @@ resource "sevalla_application_private_port" "example" {
 ### Required
 
 - `application_id` (String) The ID of the application this private port belongs to.
-- `port` (Number) The port number.
-- `process_id` (String) The ID of the process this private port belongs to.
-- `protocol` (String) The protocol (TCP or UDP).
+- `port` (Number) The internal container port to expose (1-65535).
+- `process_id` (String) The ID of the process to expose the port on.
 
 ### Read-Only
 
 - `created_at` (String) The timestamp when the private port was created.
 - `id` (String) The unique identifier of the private port.
-- `status` (String) The current status of the private port.
+- `status` (String) The status of the private port: `creating`, `ready`, `failed` or `deleting`.
 - `updated_at` (String) The timestamp when the private port was last updated.

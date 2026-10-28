@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
 
@@ -42,16 +44,21 @@ func (r *loadBalancerResource) Schema(_ context.Context, _ resource.SchemaReques
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "The display name of the load balancer.",
+				Description: "The display name of the load balancer (2-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 64)},
 			},
 			"type": schema.StringAttribute{
-				Description: "The routing type. Valid values: DEFAULT, GEO.",
+				Description: "The routing type: `DEFAULT` (round-robin or weighted routing) or `GEO` (routing by client location). Defaults to `DEFAULT`.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("DEFAULT", "GEO")},
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The project ID to associate with this load balancer.",
+				Description: "The ID of the project to group the load balancer under. Removing it removes the load balancer from the project.",
 				Optional:    true,
 			},
 			// Computed-only attributes
@@ -193,7 +200,7 @@ func (r *loadBalancerResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	err := r.client.DeleteLoadBalancer(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Load Balancer",
 			"Could not delete load balancer ID "+state.ID.ValueString()+": "+err.Error(),

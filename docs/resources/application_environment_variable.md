@@ -36,13 +36,13 @@ resource "sevalla_application_environment_variable" "build_only" {
 ### Required
 
 - `application_id` (String) The ID of the application this environment variable belongs to.
-- `key` (String) The environment variable key.
-- `value` (String, Sensitive) The environment variable value.
+- `key` (String) The environment variable key. Must be unique within the application and contain only letters, digits, `-`, `_`, `.` or `:`.
+- `value` (String, Sensitive) The environment variable value (at most 32768 characters).
 
 ### Optional
 
-- `is_buildtime` (Boolean) Whether the environment variable is available at build time.
-- `is_runtime` (Boolean) Whether the environment variable is available at runtime.
+- `is_buildtime` (Boolean) Whether the environment variable is available at build time. Defaults to `true`.
+- `is_runtime` (Boolean) Whether the environment variable is available at runtime. Defaults to `true`.
 
 ### Read-Only
 

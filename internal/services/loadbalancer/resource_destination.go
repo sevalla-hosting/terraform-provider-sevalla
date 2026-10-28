@@ -5,11 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/float64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/float64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -65,43 +72,68 @@ func (r *loadBalancerDestinationResource) Schema(_ context.Context, _ resource.S
 				},
 			},
 			"service_type": schema.StringAttribute{
-				Description: "The service type. Valid values: APP, STATIC_SITE, OBJECT_STORAGE, EXTERNAL, LOAD_BALANCER.",
+				Description: "The type of the backing service. Valid values: `APP`, `STATIC_SITE`, `OBJECT_STORAGE`, `LOAD_BALANCER`, `EXTERNAL`.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("APP", "STATIC_SITE", "OBJECT_STORAGE", "EXTERNAL", "LOAD_BALANCER")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"service_id": schema.StringAttribute{
-				Description: "The ID of the service to add as a destination. Must not be set for EXTERNAL type.",
+				Description: "The ID of the backing service. Required for every type except `EXTERNAL`, where it must not be set.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"weight": schema.Int64Attribute{
-				Description: "The weight for weighted routing.",
+				Description: "The traffic weight for weighted routing (0-10000). Higher values receive proportionally more traffic.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.Int64{int64validator.Between(0, 10000)},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+					int64planmodifier.RequiresReplace(),
+				},
 			},
 			"url": schema.StringAttribute{
-				Description: "The URL for external destinations.",
+				Description: "The URL of an `EXTERNAL` destination.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplace(),
+				},
 			},
 			"latitude": schema.Float64Attribute{
-				Description: "The latitude for geo routing.",
+				Description: "The latitude for GEO routing (-90 to 90).",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.Float64{float64validator.Between(-90, 90)},
+				PlanModifiers: []planmodifier.Float64{
+					float64planmodifier.UseStateForUnknown(),
+					float64planmodifier.RequiresReplace(),
+				},
 			},
 			"longitude": schema.Float64Attribute{
-				Description: "The longitude for geo routing.",
+				Description: "The longitude for GEO routing (-180 to 180).",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.Float64{float64validator.Between(-180, 180)},
+				PlanModifiers: []planmodifier.Float64{
+					float64planmodifier.UseStateForUnknown(),
+					float64planmodifier.RequiresReplace(),
+				},
 			},
 			"is_enabled": schema.BoolAttribute{
-				Description: "Whether the destination is enabled.",
+				Description: "Whether the destination receives traffic. Defaults to `true`.",
+				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"created_at": schema.StringAttribute{
 				Description: "The timestamp when the destination was created.",
@@ -170,6 +202,14 @@ func (r *loadBalancerDestinationResource) Create(ctx context.Context, req resour
 		resp.Diagnostics.AddError("Error Creating Load Balancer Destination", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("load_balancer_id"), lbID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), dest.ID)...)
+
+	dest, err = r.setEnabled(ctx, lbID, dest, plan.IsEnabled)
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Load Balancer Destination", err.Error())
+		return
+	}
 
 	flattenLBDestination(dest, &plan)
 
@@ -183,8 +223,7 @@ func (r *loadBalancerDestinationResource) Read(ctx context.Context, req resource
 		return
 	}
 
-	lbID := state.LoadBalancerID.ValueString()
-	destinations, err := r.client.ListLoadBalancerDestinations(ctx, lbID)
+	found, err := r.find(ctx, state.LoadBalancerID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -192,14 +231,6 @@ func (r *loadBalancerDestinationResource) Read(ctx context.Context, req resource
 		}
 		resp.Diagnostics.AddError("Error Reading Load Balancer Destination", err.Error())
 		return
-	}
-
-	var found *client.LoadBalancerDestination
-	for i := range destinations {
-		if destinations[i].ID == state.ID.ValueString() {
-			found = &destinations[i]
-			break
-		}
 	}
 
 	if found == nil {
@@ -212,11 +243,61 @@ func (r *loadBalancerDestinationResource) Read(ctx context.Context, req resource
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *loadBalancerDestinationResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Load balancer destinations cannot be updated. Delete and recreate the resource instead.",
-	)
+// Update is only reached when is_enabled changes; every other argument forces replacement.
+func (r *loadBalancerDestinationResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state LoadBalancerDestinationResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	lbID := state.LoadBalancerID.ValueString()
+	dest, err := r.find(ctx, lbID, state.ID.ValueString())
+	if err == nil && dest == nil {
+		err = fmt.Errorf("destination %s not found", state.ID.ValueString())
+	}
+	if err == nil {
+		dest, err = r.setEnabled(ctx, lbID, dest, plan.IsEnabled)
+	}
+	if err != nil {
+		resp.Diagnostics.AddError("Error Updating Load Balancer Destination", err.Error())
+		return
+	}
+
+	flattenLBDestination(dest, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// find returns the destination with the given ID, or nil when there is none.
+// The API has no endpoint to get a single destination.
+func (r *loadBalancerDestinationResource) find(ctx context.Context, lbID, destID string) (*client.LoadBalancerDestination, error) {
+	destinations, err := r.client.ListLoadBalancerDestinations(ctx, lbID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range destinations {
+		if destinations[i].ID == destID {
+			return &destinations[i], nil
+		}
+	}
+	return nil, nil
+}
+
+// setEnabled toggles the destination when its enabled state differs from
+// want, which is skipped when want is unknown (not configured).
+func (r *loadBalancerDestinationResource) setEnabled(ctx context.Context, lbID string, dest *client.LoadBalancerDestination, want types.Bool) (*client.LoadBalancerDestination, error) {
+	if want.IsUnknown() || want.IsNull() || want.ValueBool() == dest.IsEnabled {
+		return dest, nil
+	}
+	if err := r.client.ToggleLoadBalancerDestination(ctx, lbID, dest.ID); err != nil {
+		return nil, fmt.Errorf("could not toggle destination %s: %w", dest.ID, err)
+	}
+	toggled, err := r.find(ctx, lbID, dest.ID)
+	if err == nil && toggled == nil {
+		err = fmt.Errorf("destination %s not found after toggling it", dest.ID)
+	}
+	return toggled, err
 }
 
 func (r *loadBalancerDestinationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -227,7 +308,7 @@ func (r *loadBalancerDestinationResource) Delete(ctx context.Context, req resour
 	}
 
 	err := r.client.DeleteLoadBalancerDestination(ctx, state.LoadBalancerID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Load Balancer Destination", err.Error())
 		return
 	}

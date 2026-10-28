@@ -26,13 +26,13 @@ resource "sevalla_global_environment_variable" "example" {
 
 ### Required
 
-- `key` (String) The key of the environment variable.
-- `value` (String, Sensitive) The value of the environment variable.
+- `key` (String) The key of the environment variable. Must be unique across the company's global variables and contain only letters, digits, `-`, `_`, `.` or `:`.
+- `value` (String, Sensitive) The value of the environment variable (at most 32768 characters).
 
 ### Optional
 
-- `is_buildtime` (Boolean) Whether this environment variable is available at build time.
-- `is_runtime` (Boolean) Whether this environment variable is available at runtime.
+- `is_buildtime` (Boolean) Whether this environment variable is available at build time. Defaults to `true`.
+- `is_runtime` (Boolean) Whether this environment variable is available at runtime. Defaults to `true`.
 
 ### Read-Only
 

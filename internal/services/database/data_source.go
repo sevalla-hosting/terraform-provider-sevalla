@@ -55,20 +55,20 @@ func (d *databaseDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"db_name": schema.StringAttribute{
-				Description: "The database name.",
+				Description: "The database name. `0` for Redis and Valkey.",
 				Computed:    true,
 			},
 			"db_password": schema.StringAttribute{
-				Description: "The database password.",
+				Description: "Always null: the API never returns the password.",
 				Computed:    true,
 				Sensitive:   true,
 			},
 			"db_user": schema.StringAttribute{
-				Description: "The database user.",
+				Description: "The database user. Null for Redis and Valkey.",
 				Computed:    true,
 			},
 			"extensions": schema.SingleNestedAttribute{
-				Description: "PostgreSQL extensions.",
+				Description: "Always null: the API does not return the enabled extensions.",
 				Computed:    true,
 				Attributes: map[string]schema.Attribute{
 					"enable_vector": schema.BoolAttribute{
@@ -114,15 +114,15 @@ func (d *databaseDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 				Computed:    true,
 			},
 			"cpu_limit": schema.Int64Attribute{
-				Description: "The CPU limit for the database.",
+				Description: "The CPU limit for the database in millicores.",
 				Computed:    true,
 			},
 			"memory_limit": schema.Int64Attribute{
-				Description: "The memory limit for the database in bytes.",
+				Description: "The memory limit for the database in megabytes.",
 				Computed:    true,
 			},
 			"storage_size": schema.Int64Attribute{
-				Description: "The storage size for the database in bytes.",
+				Description: "The storage size for the database in megabytes.",
 				Computed:    true,
 			},
 			"internal_hostname": schema.StringAttribute{

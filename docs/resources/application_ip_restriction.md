@@ -13,20 +13,12 @@ Manages IP restrictions for a Sevalla application.
 ## Example Usage
 
 ```terraform
+# Only allow traffic from an office network and a VPN server
 resource "sevalla_application_ip_restriction" "example" {
   application_id = sevalla_application.example.id
   type           = "allow"
-  enabled        = true
-
-  rules {
-    address     = "203.0.113.0/24"
-    description = "Office network"
-  }
-
-  rules {
-    address     = "198.51.100.50"
-    description = "VPN server"
-  }
+  is_enabled     = true
+  ip_list        = ["203.0.113.0/24", "198.51.100.50"]
 }
 ```
 
@@ -36,17 +28,6 @@ resource "sevalla_application_ip_restriction" "example" {
 ### Required
 
 - `application_id` (String) The ID of the application. Acts as the resource identifier.
-- `enabled` (Boolean) Whether IP restriction is enabled.
-- `rules` (Attributes List) List of IP restriction rules. (see [below for nested schema](#nestedatt--rules))
-- `type` (String) The restriction type. Valid values: allow, deny.
-
-<a id="nestedatt--rules"></a>
-### Nested Schema for `rules`
-
-Required:
-
-- `address` (String) The IP address or CIDR range.
-
-Optional:
-
-- `description` (String) A description for the rule.
+- `ip_list` (List of String) IP addresses or CIDR ranges the restriction applies to (at most 500).
+- `is_enabled` (Boolean) Whether IP restriction is enabled.
+- `type` (String) The restriction type: `allow` lets only the listed IPs in, `deny` blocks them.

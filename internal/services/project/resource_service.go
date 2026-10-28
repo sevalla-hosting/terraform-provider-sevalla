@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -41,7 +43,7 @@ func (r *projectServiceResource) Metadata(_ context.Context, req resource.Metada
 
 func (r *projectServiceResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Attaches a service (application, database, static site, etc.) to a Sevalla project.",
+		Description: "Adds a service (application, database, pipeline or object storage bucket) to a Sevalla project. Adding a pipeline also moves the applications in its stages into the project. Do not also manage the same assignment with the service's own `project_id` attribute.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the project service association.",
@@ -65,8 +67,9 @@ func (r *projectServiceResource) Schema(_ context.Context, _ resource.SchemaRequ
 				},
 			},
 			"service_type": schema.StringAttribute{
-				Description: "The type of the service (app, database, pipeline, object-storage).",
+				Description: "The type of the service. Valid values: `app`, `database`, `pipeline`, `object-storage`.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("app", "database", "pipeline", "object-storage")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -166,7 +169,7 @@ func (r *projectServiceResource) Delete(ctx context.Context, req resource.Delete
 	}
 
 	err := r.client.RemoveProjectService(ctx, state.ProjectID.ValueString(), state.ID.ValueString(), state.ServiceType.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Project Service", err.Error())
 		return
 	}

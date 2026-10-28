@@ -19,6 +19,7 @@ resource "sevalla_static_site" "example" {
   repo_url       = "https://github.com/example/docs"
   default_branch = "main"
   build_command  = "npm run build"
+  node_version   = "lts"
 }
 
 # Static site from a private GitHub repository
@@ -40,23 +41,26 @@ resource "sevalla_static_site" "private" {
 ### Required
 
 - `default_branch` (String) The default branch to deploy from.
-- `display_name` (String) The display name of the static site.
+- `display_name` (String) The display name of the static site (2-64 characters).
 - `repo_url` (String) The repository URL for the static site source.
 
 ### Optional
 
+- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_command` (String) The build command to run.
 - `error_file` (String) The error file for the static site.
-- `git_type` (String) The Git provider type. Valid values: github, bitbucket, gitlab.
+- `git_lfs_enabled` (Boolean) Whether Git LFS objects are fetched during the source checkout step. Enabled by default.
+- `git_type` (String) The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`. Null for public Git sources.
+- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.
 - `index_file` (String) The index file for the static site.
 - `install_command` (String) The install command to run.
 - `is_preview_enabled` (Boolean) Whether preview deployments are enabled.
-- `node_version` (String) The Node.js version to use for building.
-- `project_id` (String) The project ID to associate with this static site.
+- `node_version` (String) The Node.js version used to build the site. Valid values: `16`, `18`, `20`, `22`, `lts`, `latest`. Required by the API when `build_command` or `install_command` is set.
+- `project_id` (String) The ID of the project to group the static site under. The API cannot move a static site between projects, so changing this creates a new static site.
 - `published_directory` (String) The directory where the built static files are published.
 - `root_directory` (String) The root directory within the repository.
-- `source` (String) The source type of the static site. Valid values: privateGit, publicGit.
+- `source` (String) The source type of the static site. Valid values: `publicGit` (default), `privateGit`.
 
 ### Read-Only
 

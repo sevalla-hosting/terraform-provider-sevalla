@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // StaticSiteResourceModel is the Terraform state model for the sevalla_static_site resource.
@@ -182,16 +183,13 @@ func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, stat
 		req.DefaultBranch = &v
 	}
 	if !plan.BuildCommand.IsNull() && !plan.BuildCommand.IsUnknown() && !plan.BuildCommand.Equal(state.BuildCommand) {
-		v := plan.BuildCommand.ValueString()
-		req.BuildCommand = &v
+		req.BuildCommand = plan.BuildCommand.ValueStringPointer()
 	}
 	if !plan.NodeVersion.IsNull() && !plan.NodeVersion.IsUnknown() && !plan.NodeVersion.Equal(state.NodeVersion) {
-		v := plan.NodeVersion.ValueString()
-		req.NodeVersion = &v
+		req.NodeVersion = plan.NodeVersion.ValueStringPointer()
 	}
 	if !plan.PublishedDirectory.IsNull() && !plan.PublishedDirectory.IsUnknown() && !plan.PublishedDirectory.Equal(state.PublishedDirectory) {
-		v := plan.PublishedDirectory.ValueString()
-		req.PublishedDirectory = &v
+		req.PublishedDirectory = plan.PublishedDirectory.ValueStringPointer()
 	}
 	if !plan.IsPreviewEnabled.IsNull() && !plan.IsPreviewEnabled.IsUnknown() && !plan.IsPreviewEnabled.Equal(state.IsPreviewEnabled) {
 		v := plan.IsPreviewEnabled.ValueBool()
@@ -206,38 +204,30 @@ func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, stat
 		req.Source = &v
 	}
 	if !plan.GitType.IsNull() && !plan.GitType.IsUnknown() && !plan.GitType.Equal(state.GitType) {
-		v := plan.GitType.ValueString()
-		req.GitType = &v
+		req.GitType = plan.GitType.ValueStringPointer()
 	}
 	if !plan.RepoURL.IsNull() && !plan.RepoURL.IsUnknown() && !plan.RepoURL.Equal(state.RepoURL) {
 		v := plan.RepoURL.ValueString()
 		req.RepoURL = &v
 	}
 	if !plan.InstallCommand.IsNull() && !plan.InstallCommand.IsUnknown() && !plan.InstallCommand.Equal(state.InstallCommand) {
-		v := plan.InstallCommand.ValueString()
-		req.InstallCommand = &v
+		req.InstallCommand = plan.InstallCommand.ValueStringPointer()
 	}
 	if !plan.RootDirectory.IsNull() && !plan.RootDirectory.IsUnknown() && !plan.RootDirectory.Equal(state.RootDirectory) {
-		v := plan.RootDirectory.ValueString()
-		req.RootDirectory = &v
+		req.RootDirectory = plan.RootDirectory.ValueStringPointer()
 	}
 	if !plan.IndexFile.IsNull() && !plan.IndexFile.IsUnknown() && !plan.IndexFile.Equal(state.IndexFile) {
 		v := plan.IndexFile.ValueString()
 		req.IndexFile = &v
 	}
 	if !plan.ErrorFile.IsNull() && !plan.ErrorFile.IsUnknown() && !plan.ErrorFile.Equal(state.ErrorFile) {
-		v := plan.ErrorFile.ValueString()
-		req.ErrorFile = &v
+		req.ErrorFile = plan.ErrorFile.ValueStringPointer()
 	}
-	if !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
-		var paths []string
-		plan.AllowDeployPaths.ElementsAs(ctx, &paths, false)
-		req.AllowDeployPaths = paths
+	if !plan.AllowDeployPaths.IsUnknown() && !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
+		req.AllowDeployPaths = listutil.Strings(ctx, plan.AllowDeployPaths)
 	}
-	if !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
-		var paths []string
-		plan.IgnoreDeployPaths.ElementsAs(ctx, &paths, false)
-		req.IgnoreDeployPaths = paths
+	if !plan.IgnoreDeployPaths.IsUnknown() && !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
+		req.IgnoreDeployPaths = listutil.Strings(ctx, plan.IgnoreDeployPaths)
 	}
 
 	return req

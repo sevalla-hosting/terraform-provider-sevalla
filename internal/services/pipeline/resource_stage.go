@@ -5,12 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -67,17 +70,22 @@ func (r *pipelineStageResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"name": schema.StringAttribute{
-				Description: "The name of the pipeline stage.",
+				Description: "The name of the pipeline stage (1-255 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"insert_before": schema.Int64Attribute{
-				Description: "Position to insert the stage at. Existing stages at this position and above are shifted up.",
+				Description: "Position to insert the stage at (0-50). Existing stages at this position and above are shifted up. Changing it creates a new stage, except after an import, when it is only recorded.",
 				Required:    true,
+				Validators:  []validator.Int64{int64validator.Between(0, 50)},
 				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.RequiresReplace(),
+					// The API does not return insert_before, so an imported stage has none.
+					int64planmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.Int64Request, resp *int64planmodifier.RequiresReplaceIfFuncResponse) {
+						resp.RequiresReplace = !req.StateValue.IsNull()
+					}, "Changing insert_before creates a new stage.", "Changing `insert_before` creates a new stage."),
 				},
 			},
 			"type": schema.StringAttribute{
@@ -88,14 +96,15 @@ func (r *pipelineStageResource) Schema(_ context.Context, _ resource.SchemaReque
 				},
 			},
 			"order": schema.Int64Attribute{
-				Description: "The stage order.",
+				Description: "The current position of the stage, starting from 0. It changes when other stages are added or removed.",
 				Computed:    true,
 			},
 			"branch": schema.StringAttribute{
-				Description: "The branch for branch-type pipelines.",
+				Description: "The Git branch of the stage, used in branch-type pipelines.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
@@ -206,11 +215,16 @@ func (r *pipelineStageResource) Read(ctx context.Context, req resource.ReadReque
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *pipelineStageResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Pipeline stages cannot be updated. Delete and recreate the stage instead.",
-	)
+// Update is only reached when insert_before is set on an imported stage; there is nothing to send.
+func (r *pipelineStageResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state PipelineStageResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.InsertBefore = plan.InsertBefore
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *pipelineStageResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -221,7 +235,7 @@ func (r *pipelineStageResource) Delete(ctx context.Context, req resource.DeleteR
 	}
 
 	err := r.client.DeletePipelineStage(ctx, state.PipelineID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Pipeline Stage", err.Error())
 		return
 	}

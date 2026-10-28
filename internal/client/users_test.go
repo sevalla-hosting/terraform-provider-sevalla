@@ -17,7 +17,9 @@ func TestListUsers_Success(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(usersResponse{
+		json.NewEncoder(w).Encode(struct {
+			Data []User `json:"data"`
+		}{
 			Data: []User{
 				{
 					ID:       "user-1",

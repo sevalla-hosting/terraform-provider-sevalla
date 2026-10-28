@@ -1,12 +1,18 @@
-# Full-access API key
-resource "sevalla_api_key" "example" {
+data "sevalla_api_key_roles" "all" {}
+
+# API key with a predefined role
+resource "sevalla_api_key" "ci" {
   name       = "ci-cd-key"
   expires_at = "2027-01-01T00:00:00Z"
+  role_ids   = [data.sevalla_api_key_roles.all.roles[0].id]
 }
 
-# Scoped API key with specific capabilities
-resource "sevalla_api_key" "readonly" {
-  name         = "monitoring-key"
-  expires_at   = "2027-06-01T00:00:00Z"
-  capabilities = ["APP:READ", "DATABASE:READ"]
+# Read-only API key scoped with capabilities
+resource "sevalla_api_key" "monitoring" {
+  name = "monitoring-key"
+
+  capabilities = [
+    { permission = "APP:READ" },
+    { permission = "DATABASE:READ" },
+  ]
 }

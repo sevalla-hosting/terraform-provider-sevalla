@@ -23,6 +23,7 @@ type ObjectStorageResourceModel struct {
 	SecretKey    types.String `tfsdk:"secret_key"`
 	BucketName   types.String `tfsdk:"bucket_name"`
 	CompanyID    types.String `tfsdk:"company_id"`
+	Status       types.String `tfsdk:"status"`
 	CreatedAt    types.String `tfsdk:"created_at"`
 	UpdatedAt    types.String `tfsdk:"updated_at"`
 }
@@ -41,11 +42,19 @@ func flattenObjectStorage(_ context.Context, os *client.ObjectStorage, model *Ob
 	model.CreatedAt = types.StringValue(os.CreatedAt)
 	model.UpdatedAt = types.StringValue(os.UpdatedAt)
 
+	model.Status = types.StringValue(os.Status)
 	model.ProjectID = optionalString(os.ProjectID)
 	model.Domain = optionalString(os.Domain)
+	model.PublicAccess = types.BoolValue(os.Domain != nil)
 	model.Endpoint = optionalString(os.Endpoint)
-	model.AccessKey = optionalString(os.AccessKey)
-	model.SecretKey = optionalString(os.SecretKey)
+
+	// The keys are only returned when the bucket is created; keep them afterwards.
+	if os.AccessKey != nil || model.AccessKey.IsUnknown() {
+		model.AccessKey = optionalString(os.AccessKey)
+	}
+	if os.SecretKey != nil || model.SecretKey.IsUnknown() {
+		model.SecretKey = optionalString(os.SecretKey)
+	}
 
 	return diags
 }
@@ -84,9 +93,9 @@ func buildUpdateRequest(plan *ObjectStorageResourceModel, state *ObjectStorageRe
 		v := plan.DisplayName.ValueString()
 		req.DisplayName = &v
 	}
-	if !plan.ProjectID.Equal(state.ProjectID) {
-		v := plan.ProjectID.ValueString()
-		req.ProjectID = &v
+	if !plan.ProjectID.IsUnknown() && !plan.ProjectID.Equal(state.ProjectID) {
+		// A null plan value is sent as JSON null to remove the project assignment.
+		req.ProjectID = client.NullableOf(plan.ProjectID.ValueStringPointer())
 	}
 
 	return req

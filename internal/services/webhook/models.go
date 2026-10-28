@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // WebhookResourceModel is the Terraform state model for the sevalla_webhook resource.
@@ -42,7 +43,11 @@ func flattenWebhook(ctx context.Context, w *client.Webhook, model *WebhookResour
 	model.CreatedAt = types.StringValue(w.CreatedAt)
 	model.UpdatedAt = types.StringValue(w.UpdatedAt)
 
-	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, w.AllowedEvents)
+	var prior []string
+	if !model.AllowedEvents.IsNull() && !model.AllowedEvents.IsUnknown() {
+		diags.Append(model.AllowedEvents.ElementsAs(ctx, &prior, false)...)
+	}
+	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(prior, w.AllowedEvents))
 	diags.Append(d...)
 	model.AllowedEvents = allowedEvents
 
@@ -64,9 +69,8 @@ func buildCreateRequest(ctx context.Context, model *WebhookResourceModel) (*clie
 		Endpoint:      model.Endpoint.ValueString(),
 	}
 
-	if !model.Description.IsNull() && !model.Description.IsUnknown() {
-		v := model.Description.ValueString()
-		req.Description = &v
+	if !model.Description.IsUnknown() {
+		req.Description = model.Description.ValueStringPointer()
 	}
 
 	return req, diags
@@ -87,12 +91,8 @@ func buildUpdateRequest(ctx context.Context, plan *WebhookResourceModel, state *
 		req.AllowedEvents = allowedEvents
 	}
 	if !plan.Description.Equal(state.Description) {
-		if plan.Description.IsNull() {
-			req.Description = nil
-		} else {
-			v := plan.Description.ValueString()
-			req.Description = &v
-		}
+		// A null plan value is sent as JSON null to clear the description.
+		req.Description = client.NullableOf(plan.Description.ValueStringPointer())
 	}
 
 	return req, diags

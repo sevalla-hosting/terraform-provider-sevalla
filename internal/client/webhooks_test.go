@@ -143,12 +143,16 @@ func TestToggleWebhook_Success(t *testing.T) {
 		if r.URL.Path != "/webhooks/wh-123/toggle" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(Webhook{ID: "wh-123", IsEnabled: false})
 	})
 	defer server.Close()
 
-	err := c.ToggleWebhook(context.Background(), "wh-123")
+	wh, err := c.ToggleWebhook(context.Background(), "wh-123")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if wh.IsEnabled {
+		t.Error("expected webhook to be disabled after toggle")
 	}
 }

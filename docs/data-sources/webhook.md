@@ -34,8 +34,12 @@ output "webhook_endpoint" {
 - `allowed_events` (List of String) The list of events that trigger the webhook.
 - `company_id` (String) The company ID that owns the webhook.
 - `created_at` (String) When the webhook was created.
+- `created_by` (String) The identifier of the API key that created the webhook.
 - `description` (String) An optional description for the webhook.
 - `endpoint` (String) The endpoint URI the webhook sends events to.
 - `is_enabled` (Boolean) Whether the webhook is enabled.
+- `old_secret` (String, Sensitive) The previous webhook signing secret.
+- `old_secret_expired_at` (String) When the old secret expires.
 - `secret` (String, Sensitive) The webhook signing secret.
 - `updated_at` (String) When the webhook was last updated.
+- `updated_by` (String) The identifier of the API key that last updated the webhook.

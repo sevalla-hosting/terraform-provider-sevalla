@@ -52,6 +52,14 @@ func (d *databaseListDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 							Description: "The database engine type.",
 							Computed:    true,
 						},
+						"version": schema.StringAttribute{
+							Description: "The database engine version.",
+							Computed:    true,
+						},
+						"resource_type_name": schema.StringAttribute{
+							Description: "The name of the resource type (size) of the database.",
+							Computed:    true,
+						},
 						"status": schema.StringAttribute{
 							Description: "The current status of the database.",
 							Computed:    true,
@@ -107,14 +115,16 @@ func (d *databaseListDataSource) Read(ctx context.Context, _ datasource.ReadRequ
 
 	for i, db := range dbs {
 		model.Databases[i] = DatabaseListItemModel{
-			ID:          types.StringValue(db.ID),
-			Name:        types.StringValue(db.Name),
-			DisplayName: types.StringValue(db.DisplayName),
-			Type:        types.StringValue(db.Type),
-			Status:      optionalString(db.Status),
-			IsSuspended: types.BoolValue(db.IsSuspended),
-			CreatedAt:   types.StringValue(db.CreatedAt),
-			UpdatedAt:   types.StringValue(db.UpdatedAt),
+			ID:               types.StringValue(db.ID),
+			Name:             types.StringValue(db.Name),
+			DisplayName:      types.StringValue(db.DisplayName),
+			Type:             types.StringValue(db.Type),
+			Version:          types.StringValue(db.Version),
+			ResourceTypeName: optionalString(db.ResourceTypeName),
+			Status:           optionalString(db.Status),
+			IsSuspended:      types.BoolValue(db.IsSuspended),
+			CreatedAt:        types.StringValue(db.CreatedAt),
+			UpdatedAt:        types.StringValue(db.UpdatedAt),
 		}
 	}
 

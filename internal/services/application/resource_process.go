@@ -1,20 +1,27 @@
 package application
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"reflect"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -30,28 +37,30 @@ type applicationProcessResource struct {
 }
 
 type ApplicationProcessResourceModel struct {
-	ID               types.String `tfsdk:"id"`
-	ApplicationID    types.String `tfsdk:"application_id"`
-	DisplayName      types.String `tfsdk:"display_name"`
-	Type             types.String `tfsdk:"type"`
-	Entrypoint       types.String `tfsdk:"entrypoint"`
-	Port             types.Int64  `tfsdk:"port"`
-	ResourceTypeID   types.String `tfsdk:"resource_type_id"`
-	ScalingStrategy  types.Object `tfsdk:"scaling_strategy"`
-	Schedule         types.String `tfsdk:"schedule"`
-	TimeZone         types.String `tfsdk:"time_zone"`
-	JobStartPolicy   types.String `tfsdk:"job_start_policy"`
-	IsIngressEnabled types.Bool   `tfsdk:"is_ingress_enabled"`
-	IngressProtocol  types.String `tfsdk:"ingress_protocol"`
-	LivenessProbe    types.Object `tfsdk:"liveness_probe"`
-	ReadinessProbe   types.Object `tfsdk:"readiness_probe"`
-	Key              types.String `tfsdk:"key"`
-	ResourceTypeName types.String `tfsdk:"resource_type_name"`
-	CpuLimit         types.Int64  `tfsdk:"cpu_limit"`
-	MemoryLimit      types.Int64  `tfsdk:"memory_limit"`
-	InternalHostname types.String `tfsdk:"internal_hostname"`
-	CreatedAt        types.String `tfsdk:"created_at"`
-	UpdatedAt        types.String `tfsdk:"updated_at"`
+	ID                    types.String `tfsdk:"id"`
+	ApplicationID         types.String `tfsdk:"application_id"`
+	DisplayName           types.String `tfsdk:"display_name"`
+	Type                  types.String `tfsdk:"type"`
+	Entrypoint            types.String `tfsdk:"entrypoint"`
+	Port                  types.Int64  `tfsdk:"port"`
+	ResourceTypeID        types.String `tfsdk:"resource_type_id"`
+	ScalingStrategy       types.Object `tfsdk:"scaling_strategy"`
+	Schedule              types.String `tfsdk:"schedule"`
+	TimeZone              types.String `tfsdk:"time_zone"`
+	ConcurrencyPolicy     types.String `tfsdk:"concurrency_policy"`
+	ActiveDeadlineSeconds types.Int64  `tfsdk:"active_deadline_seconds"`
+	JobStartPolicy        types.String `tfsdk:"job_start_policy"`
+	IsIngressEnabled      types.Bool   `tfsdk:"is_ingress_enabled"`
+	IngressProtocol       types.String `tfsdk:"ingress_protocol"`
+	LivenessProbe         types.Object `tfsdk:"liveness_probe"`
+	ReadinessProbe        types.Object `tfsdk:"readiness_probe"`
+	Key                   types.String `tfsdk:"key"`
+	ResourceTypeName      types.String `tfsdk:"resource_type_name"`
+	CpuLimit              types.Int64  `tfsdk:"cpu_limit"`
+	MemoryLimit           types.Int64  `tfsdk:"memory_limit"`
+	InternalHostname      types.String `tfsdk:"internal_hostname"`
+	CreatedAt             types.String `tfsdk:"created_at"`
+	UpdatedAt             types.String `tfsdk:"updated_at"`
 }
 
 // Attr type maps for nested objects.
@@ -101,165 +110,6 @@ var probeAttrTypes = map[string]attr.Type{
 	"failure_threshold":     types.Int64Type,
 }
 
-// API request/response types.
-
-type createProcessRequest struct {
-	DisplayName     string                  `json:"display_name"`
-	Type            string                  `json:"type"`
-	Entrypoint      string                  `json:"entrypoint,omitempty"`
-	Port            *int64                  `json:"port,omitempty"`
-	ResourceTypeID  string                  `json:"resource_type_id"`
-	ScalingStrategy *scalingStrategyRequest `json:"scaling_strategy"`
-	Schedule        *string                 `json:"schedule,omitempty"`
-	TimeZone        *string                 `json:"time_zone,omitempty"`
-	JobStartPolicy  *string                 `json:"job_start_policy,omitempty"`
-	LivenessProbe   *probeRequest           `json:"liveness_probe,omitempty"`
-	ReadinessProbe  *probeRequest           `json:"readiness_probe,omitempty"`
-}
-
-type updateProcessRequest struct {
-	DisplayName      *string                 `json:"display_name,omitempty"`
-	Entrypoint       *string                 `json:"entrypoint,omitempty"`
-	Port             *int64                  `json:"port,omitempty"`
-	ResourceTypeID   *string                 `json:"resource_type_id,omitempty"`
-	ScalingStrategy  *scalingStrategyRequest `json:"scaling_strategy,omitempty"`
-	Schedule         *string                 `json:"schedule,omitempty"`
-	TimeZone         *string                 `json:"time_zone,omitempty"`
-	JobStartPolicy   *string                 `json:"job_start_policy,omitempty"`
-	IsIngressEnabled *bool                   `json:"is_ingress_enabled,omitempty"`
-	IngressProtocol  *string                 `json:"ingress_protocol,omitempty"`
-	LivenessProbe    *probeRequest           `json:"liveness_probe,omitempty"`
-	ReadinessProbe   *probeRequest           `json:"readiness_probe,omitempty"`
-}
-
-type scalingStrategyRequest struct {
-	Type   string      `json:"type"`
-	Config interface{} `json:"config"`
-}
-
-type manualScalingConfig struct {
-	InstanceCount int64 `json:"instanceCount"`
-}
-
-type horizontalScalingConfig struct {
-	MinInstanceCount         int64  `json:"minInstanceCount"`
-	MaxInstanceCount         int64  `json:"maxInstanceCount"`
-	TargetCpuPercent         *int64 `json:"targetCpuPercent,omitempty"`
-	TargetMemoryPercent      *int64 `json:"targetMemoryPercent,omitempty"`
-	ScaleUpIntervalSeconds   *int64 `json:"scaleUpIntervalSeconds,omitempty"`
-	ScaleUpIncrement         *int64 `json:"scaleUpIncrement,omitempty"`
-	ScaleDownIntervalSeconds *int64 `json:"scaleDownIntervalSeconds,omitempty"`
-	ScaleDownIncrement       *int64 `json:"scaleDownIncrement,omitempty"`
-}
-
-type probeRequest struct {
-	Exec                *probeExecRequest    `json:"exec,omitempty"`
-	HttpGet             *probeHttpGetRequest `json:"httpGet,omitempty"`
-	TcpSocket           *probeTcpSocketRequest `json:"tcpSocket,omitempty"`
-	InitialDelaySeconds *int64               `json:"initialDelaySeconds,omitempty"`
-	PeriodSeconds       *int64               `json:"periodSeconds,omitempty"`
-	TimeoutSeconds      *int64               `json:"timeoutSeconds,omitempty"`
-	SuccessThreshold    *int64               `json:"successThreshold,omitempty"`
-	FailureThreshold    *int64               `json:"failureThreshold,omitempty"`
-}
-
-type probeExecRequest struct {
-	Command []string `json:"command"`
-}
-
-type probeHttpGetRequest struct {
-	Path        *string             `json:"path,omitempty"`
-	Port        *int64              `json:"port,omitempty"`
-	Host        *string             `json:"host,omitempty"`
-	Scheme      *string             `json:"scheme,omitempty"`
-	HttpHeaders []httpHeaderRequest `json:"httpHeaders,omitempty"`
-}
-
-type httpHeaderRequest struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type probeTcpSocketRequest struct {
-	Host *string `json:"host,omitempty"`
-	Port int64   `json:"port"`
-}
-
-type processResponse struct {
-	ID               string                   `json:"id"`
-	AppID            *string                  `json:"app_id"`
-	Key              string                   `json:"key"`
-	Type             string                   `json:"type"`
-	DisplayName      *string                  `json:"display_name"`
-	Entrypoint       string                   `json:"entrypoint"`
-	Port             *int64                   `json:"port"`
-	IsIngressEnabled bool                     `json:"is_ingress_enabled"`
-	IngressProtocol  *string                  `json:"ingress_protocol"`
-	ScalingStrategy  *scalingStrategyResponse `json:"scaling_strategy"`
-	ResourceTypeID   *string                  `json:"resource_type_id"`
-	ResourceTypeName *string                  `json:"resource_type_name"`
-	CpuLimit         *int64                   `json:"cpu_limit"`
-	MemoryLimit      *int64                   `json:"memory_limit"`
-	Schedule         *string                  `json:"schedule"`
-	TimeZone         *string                  `json:"time_zone"`
-	JobStartPolicy   *string                  `json:"job_start_policy"`
-	LivenessProbe    *probeResponse           `json:"liveness_probe"`
-	ReadinessProbe   *probeResponse           `json:"readiness_probe"`
-	InternalHostname *string                  `json:"internal_hostname"`
-	CreatedAt        string                   `json:"created_at"`
-	UpdatedAt        string                   `json:"updated_at"`
-}
-
-type scalingStrategyResponse struct {
-	Type   string              `json:"type"`
-	Config scalingConfigResponse `json:"config"`
-}
-
-type scalingConfigResponse struct {
-	InstanceCount            *int64 `json:"instanceCount,omitempty"`
-	MinInstanceCount         *int64 `json:"minInstanceCount,omitempty"`
-	MaxInstanceCount         *int64 `json:"maxInstanceCount,omitempty"`
-	TargetCpuPercent         *int64 `json:"targetCpuPercent,omitempty"`
-	TargetMemoryPercent      *int64 `json:"targetMemoryPercent,omitempty"`
-	ScaleUpIntervalSeconds   *int64 `json:"scaleUpIntervalSeconds,omitempty"`
-	ScaleUpIncrement         *int64 `json:"scaleUpIncrement,omitempty"`
-	ScaleDownIntervalSeconds *int64 `json:"scaleDownIntervalSeconds,omitempty"`
-	ScaleDownIncrement       *int64 `json:"scaleDownIncrement,omitempty"`
-}
-
-type probeResponse struct {
-	Exec                *probeExecResponse    `json:"exec,omitempty"`
-	HttpGet             *probeHttpGetResponse `json:"httpGet,omitempty"`
-	TcpSocket           *probeTcpSocketResponse `json:"tcpSocket,omitempty"`
-	InitialDelaySeconds *int64                `json:"initialDelaySeconds,omitempty"`
-	PeriodSeconds       *int64                `json:"periodSeconds,omitempty"`
-	TimeoutSeconds      *int64                `json:"timeoutSeconds,omitempty"`
-	SuccessThreshold    *int64                `json:"successThreshold,omitempty"`
-	FailureThreshold    *int64                `json:"failureThreshold,omitempty"`
-}
-
-type probeExecResponse struct {
-	Command []string `json:"command"`
-}
-
-type probeHttpGetResponse struct {
-	Path        *string              `json:"path,omitempty"`
-	Port        *int64               `json:"port,omitempty"`
-	Host        *string              `json:"host,omitempty"`
-	Scheme      *string              `json:"scheme,omitempty"`
-	HttpHeaders []httpHeaderResponse `json:"httpHeaders,omitempty"`
-}
-
-type httpHeaderResponse struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
-
-type probeTcpSocketResponse struct {
-	Host *string `json:"host,omitempty"`
-	Port int64   `json:"port"`
-}
-
 func NewProcessResource() resource.Resource {
 	return &applicationProcessResource{}
 }
@@ -269,15 +119,14 @@ func (r *applicationProcessResource) Metadata(_ context.Context, req resource.Me
 }
 
 func (r *applicationProcessResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
+	useState := []planmodifier.String{stringplanmodifier.UseStateForUnknown()}
 	resp.Schema = schema.Schema{
-		Description: "Manages a process for a Sevalla application.",
+		Description: "Manages a process (web, worker, cron or job) of a Sevalla application.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
-				Description: "The unique identifier of the process.",
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Description:   "The unique identifier of the process.",
+				Computed:      true,
+				PlanModifiers: useState,
 			},
 			"application_id": schema.StringAttribute{
 				Description: "The ID of the application this process belongs to.",
@@ -287,28 +136,36 @@ func (r *applicationProcessResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"display_name": schema.StringAttribute{
-				Description: "Human-readable name for the process (1-255 characters).",
+				Description: "Human-readable name for the process (1-255 characters). Cannot contain backticks, dollar signs, double quotes, backslashes or control characters.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 			},
 			"type": schema.StringAttribute{
-				Description: "The process type. Valid values: web, worker, cron, job.",
+				Description: "The process type. Valid values: `web`, `worker`, `cron`, `job`. Changing this creates a new process.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("web", "worker", "cron", "job")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"entrypoint": schema.StringAttribute{
-				Description: "Command used to start the process (max 1024 characters).",
-				Optional:    true,
-				Computed:    true,
+				Description:   "Command used to start the process (at most 1024 characters).",
+				Optional:      true,
+				Computed:      true,
+				Validators:    []validator.String{stringvalidator.LengthAtMost(1024)},
+				PlanModifiers: useState,
 			},
 			"port": schema.Int64Attribute{
 				Description: "Port number the process listens on (1-65535).",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.Int64{int64validator.Between(1, 65535)},
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
+				},
 			},
 			"resource_type_id": schema.StringAttribute{
-				Description: "The resource type ID determining CPU and memory allocation.",
+				Description: "The process resource type (machine size). Use the `sevalla_process_resource_types` data source to list them.",
 				Required:    true,
 			},
 			"scaling_strategy": schema.SingleNestedAttribute{
@@ -316,85 +173,121 @@ func (r *applicationProcessResource) Schema(_ context.Context, _ resource.Schema
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"type": schema.StringAttribute{
-						Description: "The scaling type. Valid values: manual, horizontal.",
+						Description: "The scaling type. Valid values: `manual`, `horizontal`.",
 						Required:    true,
+						Validators:  []validator.String{stringvalidator.OneOf("manual", "horizontal")},
 					},
 					"instance_count": schema.Int64Attribute{
-						Description: "The number of instances (manual scaling only). Range: 0-50.",
+						Description: "The number of instances (manual scaling only, 0-50).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(0, 50)},
 					},
 					"min_instance_count": schema.Int64Attribute{
-						Description: "Minimum number of instances (horizontal scaling only). Range: 0-50.",
+						Description: "Minimum number of instances (horizontal scaling only, 0-50).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(0, 50)},
 					},
 					"max_instance_count": schema.Int64Attribute{
-						Description: "Maximum number of instances (horizontal scaling only). Range: 0-50.",
+						Description: "Maximum number of instances (horizontal scaling only, 0-50).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(0, 50)},
 					},
 					"target_cpu_percent": schema.Int64Attribute{
 						Description: "Target CPU utilization percentage for autoscaling (1-100).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 100)},
 					},
 					"target_memory_percent": schema.Int64Attribute{
 						Description: "Target memory utilization percentage for autoscaling (1-100).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 100)},
 					},
 					"scale_up_interval_seconds": schema.Int64Attribute{
-						Description: "Seconds between scale-up evaluations (1-60000).",
+						Description: "Cooldown in seconds between scale-up events (1-60000).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 60000)},
 					},
 					"scale_up_increment": schema.Int64Attribute{
-						Description: "Number of instances to add per scale-up (1-5).",
+						Description: "Number of instances to add per scale-up event (1-5).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 5)},
 					},
 					"scale_down_interval_seconds": schema.Int64Attribute{
-						Description: "Seconds between scale-down evaluations (1-60000).",
+						Description: "Cooldown in seconds between scale-down events (1-60000).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 60000)},
 					},
 					"scale_down_increment": schema.Int64Attribute{
-						Description: "Number of instances to remove per scale-down (1-5).",
+						Description: "Number of instances to remove per scale-down event (1-5).",
 						Optional:    true,
+						Validators:  []validator.Int64{int64validator.Between(1, 5)},
 					},
 				},
 			},
 			"schedule": schema.StringAttribute{
-				Description: "Cron schedule expression (required for cron processes, max 100 characters).",
+				Description: "Cron expression for the schedule (required for cron processes, at most 100 characters).",
 				Optional:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtMost(100)},
 			},
 			"time_zone": schema.StringAttribute{
-				Description: "IANA time zone for cron schedule (e.g. America/New_York).",
+				Description: "IANA time zone for the cron schedule (e.g. `America/New_York`).",
 				Optional:    true,
-				Computed:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtMost(100)},
+			},
+			"concurrency_policy": schema.StringAttribute{
+				Description:   "What a cron process does when the previous run is still active: `Forbid` skips the new run, `Replace` cancels the running one.",
+				Optional:      true,
+				Computed:      true,
+				Validators:    []validator.String{stringvalidator.OneOf("Forbid", "Replace")},
+				PlanModifiers: useState,
+			},
+			"active_deadline_seconds": schema.Int64Attribute{
+				Description: "Maximum run time in seconds of a cron run or job. When unset or `0`, cron runs have no limit and jobs use the default of 600 seconds.",
+				Optional:    true,
+				Validators:  []validator.Int64{int64validator.AtLeast(0)},
 			},
 			"job_start_policy": schema.StringAttribute{
-				Description: "When the job runs relative to deployments (job processes only). Valid values: beforeDeployment, afterSuccessDeployment, afterFailedDeployment.",
+				Description: "When a job process runs relative to deployments. Valid values: `beforeDeployment`, `afterSuccessDeployment`, `afterFailedDeployment`.",
 				Optional:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("beforeDeployment", "afterSuccessDeployment", "afterFailedDeployment")},
 			},
 			"is_ingress_enabled": schema.BoolAttribute{
-				Description: "Whether external traffic routing is enabled.",
+				Description: "Whether external traffic is routed to the process (web processes only).",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"ingress_protocol": schema.StringAttribute{
-				Description: "The ingress protocol. Valid values: http, grpc.",
-				Optional:    true,
-				Computed:    true,
+				Description:   "The ingress protocol (web processes only). Valid values: `http`, `grpc`.",
+				Optional:      true,
+				Computed:      true,
+				Validators:    []validator.String{stringvalidator.OneOf("http", "grpc")},
+				PlanModifiers: useState,
 			},
 			"liveness_probe": schema.SingleNestedAttribute{
-				Description: "Liveness probe configuration (web processes only).",
+				Description: "Liveness probe (web processes only). Only HTTP GET probes can be configured.",
 				Optional:    true,
 				Computed:    true,
 				Attributes:  probeSchemaAttributes(),
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"readiness_probe": schema.SingleNestedAttribute{
-				Description: "Readiness probe configuration (web processes only).",
+				Description: "Readiness probe (web processes only). Only HTTP GET probes can be configured.",
 				Optional:    true,
 				Computed:    true,
 				Attributes:  probeSchemaAttributes(),
+				PlanModifiers: []planmodifier.Object{
+					objectplanmodifier.UseStateForUnknown(),
+				},
 			},
 			"key": schema.StringAttribute{
-				Description: "Unique process key within the application.",
-				Computed:    true,
+				Description:   "Unique process key within the application.",
+				Computed:      true,
+				PlanModifiers: useState,
 			},
 			"resource_type_name": schema.StringAttribute{
 				Description: "The name of the resource type (machine size).",
@@ -409,12 +302,14 @@ func (r *applicationProcessResource) Schema(_ context.Context, _ resource.Schema
 				Computed:    true,
 			},
 			"internal_hostname": schema.StringAttribute{
-				Description: "Internal Kubernetes DNS hostname for service-to-service communication.",
-				Computed:    true,
+				Description:   "Internal Kubernetes DNS hostname for service-to-service communication.",
+				Computed:      true,
+				PlanModifiers: useState,
 			},
 			"created_at": schema.StringAttribute{
-				Description: "The timestamp when the process was created.",
-				Computed:    true,
+				Description:   "The timestamp when the process was created.",
+				Computed:      true,
+				PlanModifiers: useState,
 			},
 			"updated_at": schema.StringAttribute{
 				Description: "The timestamp when the process was last updated.",
@@ -425,50 +320,102 @@ func (r *applicationProcessResource) Schema(_ context.Context, _ resource.Schema
 }
 
 func probeSchemaAttributes() map[string]schema.Attribute {
+	optionalInt := func(description string, min int64) schema.Int64Attribute {
+		return schema.Int64Attribute{
+			Description: description,
+			Optional:    true,
+			Computed:    true,
+			Validators:  []validator.Int64{int64validator.AtLeast(min)},
+			PlanModifiers: []planmodifier.Int64{
+				int64planmodifier.UseStateForUnknown(),
+			},
+		}
+	}
 	return map[string]schema.Attribute{
 		"exec": schema.SingleNestedAttribute{
-			Description: "Exec probe: runs a command inside the container.",
-			Optional:    true,
+			Description: "Exec probe that runs a command inside the container. Read-only: the API only accepts HTTP GET probes.",
+			Computed:    true,
+			PlanModifiers: []planmodifier.Object{
+				objectplanmodifier.UseStateForUnknown(),
+			},
 			Attributes: map[string]schema.Attribute{
 				"command": schema.ListAttribute{
 					Description: "Command to execute.",
-					Required:    true,
+					Computed:    true,
 					ElementType: types.StringType,
 				},
 			},
 		},
+		// Every nested field is Optional+Computed (with validators for the
+		// required ones): otherwise Terraform proposes removing a probe set
+		// outside Terraform on every plan.
 		"http_get": schema.SingleNestedAttribute{
 			Description: "HTTP GET probe.",
 			Optional:    true,
+			Computed:    true,
+			Validators: []validator.Object{
+				objectvalidator.AlsoRequires(path.MatchRelative().AtName("path")),
+			},
+			PlanModifiers: []planmodifier.Object{
+				objectplanmodifier.UseStateForUnknown(),
+			},
 			Attributes: map[string]schema.Attribute{
 				"path": schema.StringAttribute{
-					Description: "Path to probe.",
+					Description: "Path to probe. Required: a probe without a path is not saved.",
 					Optional:    true,
+					Computed:    true,
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.UseStateForUnknown(),
+					},
 				},
 				"port": schema.Int64Attribute{
 					Description: "Port to probe (1-65535).",
 					Optional:    true,
+					Computed:    true,
+					Validators:  []validator.Int64{int64validator.Between(1, 65535)},
+					PlanModifiers: []planmodifier.Int64{
+						int64planmodifier.UseStateForUnknown(),
+					},
 				},
 				"host": schema.StringAttribute{
 					Description: "Hostname for the probe request.",
 					Optional:    true,
+					Computed:    true,
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.UseStateForUnknown(),
+					},
 				},
 				"scheme": schema.StringAttribute{
-					Description: "URI scheme. Valid values: HTTP, HTTPS.",
+					Description: "URI scheme. Valid values: `HTTP`, `HTTPS`.",
 					Optional:    true,
+					Computed:    true,
+					Validators:  []validator.String{stringvalidator.OneOf("HTTP", "HTTPS")},
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.UseStateForUnknown(),
+					},
 				},
 				"http_headers": schema.ListNestedAttribute{
 					Description: "Custom HTTP headers for the probe request.",
 					Optional:    true,
+					Computed:    true,
+					Validators:  []validator.List{listvalidator.SizeAtLeast(1)},
+					PlanModifiers: []planmodifier.List{
+						listplanmodifier.UseStateForUnknown(),
+					},
 					NestedObject: schema.NestedAttributeObject{
+						Validators: []validator.Object{
+							objectvalidator.AlsoRequires(path.MatchRelative().AtName("name"), path.MatchRelative().AtName("value")),
+						},
 						Attributes: map[string]schema.Attribute{
 							"name": schema.StringAttribute{
-								Description: "Header name.",
-								Required:    true,
+								Description: "Header name. Required.",
+								Optional:    true,
+								Computed:    true,
 							},
 							"value": schema.StringAttribute{
-								Description: "Header value.",
-								Required:    true,
+								Description: "Header value. Required.",
+								Optional:    true,
+								Computed:    true,
 							},
 						},
 					},
@@ -476,39 +423,27 @@ func probeSchemaAttributes() map[string]schema.Attribute {
 			},
 		},
 		"tcp_socket": schema.SingleNestedAttribute{
-			Description: "TCP socket probe.",
-			Optional:    true,
+			Description: "TCP socket probe. Read-only: the API only accepts HTTP GET probes.",
+			Computed:    true,
+			PlanModifiers: []planmodifier.Object{
+				objectplanmodifier.UseStateForUnknown(),
+			},
 			Attributes: map[string]schema.Attribute{
 				"host": schema.StringAttribute{
 					Description: "Hostname to connect to.",
-					Optional:    true,
+					Computed:    true,
 				},
 				"port": schema.Int64Attribute{
-					Description: "Port to connect to (1-65535).",
-					Required:    true,
+					Description: "Port to connect to.",
+					Computed:    true,
 				},
 			},
 		},
-		"initial_delay_seconds": schema.Int64Attribute{
-			Description: "Seconds before the probe starts after container start.",
-			Optional:    true,
-		},
-		"period_seconds": schema.Int64Attribute{
-			Description: "How often (in seconds) to perform the probe.",
-			Optional:    true,
-		},
-		"timeout_seconds": schema.Int64Attribute{
-			Description: "Seconds after which the probe times out.",
-			Optional:    true,
-		},
-		"success_threshold": schema.Int64Attribute{
-			Description: "Consecutive successes required to be considered healthy.",
-			Optional:    true,
-		},
-		"failure_threshold": schema.Int64Attribute{
-			Description: "Consecutive failures required to be considered unhealthy.",
-			Optional:    true,
-		},
+		"initial_delay_seconds": optionalInt("Seconds after the container starts before the probe starts.", 0),
+		"period_seconds":        optionalInt("How often (in seconds) to perform the probe.", 1),
+		"timeout_seconds":       optionalInt("Seconds after which the probe times out. The API defaults it to 120.", 1),
+		"success_threshold":     optionalInt("Consecutive successes required to be considered healthy.", 1),
+		"failure_threshold":     optionalInt("Consecutive failures required to be considered unhealthy.", 1),
 	}
 }
 
@@ -542,10 +477,29 @@ func (r *applicationProcessResource) Create(ctx context.Context, req resource.Cr
 		return
 	}
 
-	process, err := r.doCreateProcess(ctx, plan.ApplicationID.ValueString(), createReq)
+	appID := plan.ApplicationID.ValueString()
+	process, err := r.client.CreateProcess(ctx, appID, createReq)
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Application Process", err.Error())
 		return
+	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("application_id"), appID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), process.ID)...)
+
+	// The create endpoint does not accept the ingress settings; apply them with an update.
+	updateReq := &client.UpdateProcessRequest{}
+	if v := plan.IsIngressEnabled; !v.IsUnknown() && !v.IsNull() && v.ValueBool() != process.IsIngressEnabled {
+		updateReq.IsIngressEnabled = v.ValueBoolPointer()
+	}
+	if v := plan.IngressProtocol; !v.IsUnknown() && !v.IsNull() && (process.IngressProtocol == nil || v.ValueString() != *process.IngressProtocol) {
+		updateReq.IngressProtocol = v.ValueStringPointer()
+	}
+	if updateReq.IsIngressEnabled != nil || updateReq.IngressProtocol != nil {
+		process, err = r.client.UpdateProcess(ctx, appID, process.ID, updateReq)
+		if err != nil {
+			resp.Diagnostics.AddError("Error Updating Application Process After Create", err.Error())
+			return
+		}
 	}
 
 	resp.Diagnostics.Append(flattenProcess(ctx, process, &plan)...)
@@ -559,7 +513,7 @@ func (r *applicationProcessResource) Read(ctx context.Context, req resource.Read
 		return
 	}
 
-	process, err := r.doGetProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
+	process, err := r.client.GetProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -592,7 +546,13 @@ func (r *applicationProcessResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	process, err := r.doUpdateProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString(), updateReq)
+	var process *client.Process
+	var err error
+	if reflect.ValueOf(*updateReq).IsZero() {
+		process, err = r.client.GetProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
+	} else {
+		process, err = r.client.UpdateProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString(), updateReq)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Application Process", err.Error())
 		return
@@ -609,8 +569,8 @@ func (r *applicationProcessResource) Delete(ctx context.Context, req resource.De
 		return
 	}
 
-	err := r.doDeleteProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	err := r.client.DeleteProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Application Process", err.Error())
 		return
 	}
@@ -632,50 +592,116 @@ func (r *applicationProcessResource) ImportState(ctx context.Context, req resour
 
 // Build helpers.
 
-func buildCreateProcessRequest(ctx context.Context, plan *ApplicationProcessResourceModel) (*createProcessRequest, diag.Diagnostics) {
+func knownString(v types.String) *string {
+	if v.IsUnknown() {
+		return nil
+	}
+	return v.ValueStringPointer()
+}
+
+func knownInt64(v types.Int64) *int64 {
+	if v.IsUnknown() {
+		return nil
+	}
+	return v.ValueInt64Pointer()
+}
+
+func buildCreateProcessRequest(ctx context.Context, plan *ApplicationProcessResourceModel) (*client.CreateProcessRequest, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	req := &createProcessRequest{
-		DisplayName:    plan.DisplayName.ValueString(),
-		Type:           plan.Type.ValueString(),
-		ResourceTypeID: plan.ResourceTypeID.ValueString(),
+	req := &client.CreateProcessRequest{
+		DisplayName:           plan.DisplayName.ValueString(),
+		Type:                  plan.Type.ValueString(),
+		ResourceTypeID:        plan.ResourceTypeID.ValueString(),
+		Entrypoint:            knownString(plan.Entrypoint),
+		Port:                  knownInt64(plan.Port),
+		Schedule:              knownString(plan.Schedule),
+		TimeZone:              knownString(plan.TimeZone),
+		ConcurrencyPolicy:     knownString(plan.ConcurrencyPolicy),
+		ActiveDeadlineSeconds: knownInt64(plan.ActiveDeadlineSeconds),
+		JobStartPolicy:        knownString(plan.JobStartPolicy),
 	}
 
-	if !plan.Entrypoint.IsNull() && !plan.Entrypoint.IsUnknown() {
-		req.Entrypoint = plan.Entrypoint.ValueString()
-	}
-	if !plan.Port.IsNull() && !plan.Port.IsUnknown() {
-		v := plan.Port.ValueInt64()
-		req.Port = &v
-	}
-	if !plan.Schedule.IsNull() && !plan.Schedule.IsUnknown() {
-		v := plan.Schedule.ValueString()
-		req.Schedule = &v
-	}
-	if !plan.TimeZone.IsNull() && !plan.TimeZone.IsUnknown() {
-		v := plan.TimeZone.ValueString()
-		req.TimeZone = &v
-	}
-	if !plan.JobStartPolicy.IsNull() && !plan.JobStartPolicy.IsUnknown() {
-		v := plan.JobStartPolicy.ValueString()
-		req.JobStartPolicy = &v
-	}
-	// Note: is_ingress_enabled and ingress_protocol are NOT accepted on create
-	// (not in the POST request schema). They can only be set via PATCH update.
-
-	ss, d := buildScalingStrategyRequest(ctx, plan.ScalingStrategy)
+	ss, d := buildScalingStrategy(plan.ScalingStrategy)
 	diags.Append(d...)
-	if !diags.HasError() {
+	req.ScalingStrategy = ss
+
+	p, d := buildProbe(ctx, plan.LivenessProbe)
+	diags.Append(d...)
+	req.LivenessProbe = p
+
+	p, d = buildProbe(ctx, plan.ReadinessProbe)
+	diags.Append(d...)
+	req.ReadinessProbe = p
+
+	return req, diags
+}
+
+// buildUpdateProcessRequest sends only the attributes whose planned value is
+// known and differs from state.
+func buildUpdateProcessRequest(ctx context.Context, plan, state *ApplicationProcessResourceModel) (*client.UpdateProcessRequest, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	req := &client.UpdateProcessRequest{}
+
+	changed := func(p, s attr.Value) bool { return !p.IsUnknown() && !p.Equal(s) }
+	empty := ""
+	var zero int64
+
+	if changed(plan.DisplayName, state.DisplayName) {
+		req.DisplayName = plan.DisplayName.ValueStringPointer()
+	}
+	if changed(plan.Entrypoint, state.Entrypoint) {
+		req.Entrypoint = plan.Entrypoint.ValueStringPointer()
+	}
+	if changed(plan.Port, state.Port) {
+		req.Port = plan.Port.ValueInt64Pointer()
+	}
+	if changed(plan.ResourceTypeID, state.ResourceTypeID) {
+		req.ResourceTypeID = plan.ResourceTypeID.ValueStringPointer()
+	}
+	// The API clears these when sent an empty value.
+	if changed(plan.Schedule, state.Schedule) {
+		req.Schedule = &empty
+		if !plan.Schedule.IsNull() {
+			req.Schedule = plan.Schedule.ValueStringPointer()
+		}
+	}
+	if changed(plan.TimeZone, state.TimeZone) {
+		req.TimeZone = &empty
+		if !plan.TimeZone.IsNull() {
+			req.TimeZone = plan.TimeZone.ValueStringPointer()
+		}
+	}
+	if changed(plan.ActiveDeadlineSeconds, state.ActiveDeadlineSeconds) {
+		req.ActiveDeadlineSeconds = &zero
+		if !plan.ActiveDeadlineSeconds.IsNull() {
+			req.ActiveDeadlineSeconds = plan.ActiveDeadlineSeconds.ValueInt64Pointer()
+		}
+	}
+	if changed(plan.ConcurrencyPolicy, state.ConcurrencyPolicy) {
+		req.ConcurrencyPolicy = plan.ConcurrencyPolicy.ValueStringPointer()
+	}
+	if changed(plan.JobStartPolicy, state.JobStartPolicy) {
+		req.JobStartPolicy = plan.JobStartPolicy.ValueStringPointer()
+	}
+	if changed(plan.IsIngressEnabled, state.IsIngressEnabled) {
+		req.IsIngressEnabled = plan.IsIngressEnabled.ValueBoolPointer()
+	}
+	if changed(plan.IngressProtocol, state.IngressProtocol) {
+		req.IngressProtocol = plan.IngressProtocol.ValueStringPointer()
+	}
+	if changed(plan.ScalingStrategy, state.ScalingStrategy) {
+		ss, d := buildScalingStrategy(plan.ScalingStrategy)
+		diags.Append(d...)
 		req.ScalingStrategy = ss
 	}
-
-	if !plan.LivenessProbe.IsNull() && !plan.LivenessProbe.IsUnknown() {
-		p, d := buildProbeRequest(ctx, plan.LivenessProbe)
+	if changed(plan.LivenessProbe, state.LivenessProbe) {
+		p, d := buildProbe(ctx, plan.LivenessProbe)
 		diags.Append(d...)
 		req.LivenessProbe = p
 	}
-	if !plan.ReadinessProbe.IsNull() && !plan.ReadinessProbe.IsUnknown() {
-		p, d := buildProbeRequest(ctx, plan.ReadinessProbe)
+	if changed(plan.ReadinessProbe, state.ReadinessProbe) {
+		p, d := buildProbe(ctx, plan.ReadinessProbe)
 		diags.Append(d...)
 		req.ReadinessProbe = p
 	}
@@ -683,333 +709,160 @@ func buildCreateProcessRequest(ctx context.Context, plan *ApplicationProcessReso
 	return req, diags
 }
 
-func buildUpdateProcessRequest(ctx context.Context, plan, state *ApplicationProcessResourceModel) (*updateProcessRequest, diag.Diagnostics) {
-	var diags diag.Diagnostics
-	req := &updateProcessRequest{}
-
-	if !plan.DisplayName.Equal(state.DisplayName) {
-		v := plan.DisplayName.ValueString()
-		req.DisplayName = &v
+func int64Attr(attrs map[string]attr.Value, key string) *int64 {
+	v, ok := attrs[key].(types.Int64)
+	if !ok || v.IsUnknown() {
+		return nil
 	}
-	if !plan.Entrypoint.Equal(state.Entrypoint) {
-		v := plan.Entrypoint.ValueString()
-		req.Entrypoint = &v
-	}
-	if !plan.Port.Equal(state.Port) {
-		v := plan.Port.ValueInt64()
-		req.Port = &v
-	}
-	if !plan.ResourceTypeID.Equal(state.ResourceTypeID) {
-		v := plan.ResourceTypeID.ValueString()
-		req.ResourceTypeID = &v
-	}
-	if !plan.Schedule.Equal(state.Schedule) {
-		if plan.Schedule.IsNull() {
-			empty := ""
-			req.Schedule = &empty
-		} else {
-			v := plan.Schedule.ValueString()
-			req.Schedule = &v
-		}
-	}
-	if !plan.TimeZone.Equal(state.TimeZone) {
-		if plan.TimeZone.IsNull() {
-			empty := ""
-			req.TimeZone = &empty
-		} else {
-			v := plan.TimeZone.ValueString()
-			req.TimeZone = &v
-		}
-	}
-	if !plan.JobStartPolicy.Equal(state.JobStartPolicy) {
-		v := plan.JobStartPolicy.ValueString()
-		req.JobStartPolicy = &v
-	}
-	if !plan.IsIngressEnabled.Equal(state.IsIngressEnabled) {
-		v := plan.IsIngressEnabled.ValueBool()
-		req.IsIngressEnabled = &v
-	}
-	if !plan.IngressProtocol.Equal(state.IngressProtocol) {
-		v := plan.IngressProtocol.ValueString()
-		req.IngressProtocol = &v
-	}
-	if !plan.ScalingStrategy.Equal(state.ScalingStrategy) {
-		ss, d := buildScalingStrategyRequest(ctx, plan.ScalingStrategy)
-		diags.Append(d...)
-		req.ScalingStrategy = ss
-	}
-	if !plan.LivenessProbe.Equal(state.LivenessProbe) {
-		if plan.LivenessProbe.IsNull() {
-			req.LivenessProbe = nil
-		} else {
-			p, d := buildProbeRequest(ctx, plan.LivenessProbe)
-			diags.Append(d...)
-			req.LivenessProbe = p
-		}
-	}
-	if !plan.ReadinessProbe.Equal(state.ReadinessProbe) {
-		if plan.ReadinessProbe.IsNull() {
-			req.ReadinessProbe = nil
-		} else {
-			p, d := buildProbeRequest(ctx, plan.ReadinessProbe)
-			diags.Append(d...)
-			req.ReadinessProbe = p
-		}
-	}
-
-	return req, diags
+	return v.ValueInt64Pointer()
 }
 
-func buildScalingStrategyRequest(ctx context.Context, obj types.Object) (*scalingStrategyRequest, diag.Diagnostics) {
+func buildScalingStrategy(obj types.Object) (*client.ScalingStrategy, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if obj.IsNull() || obj.IsUnknown() {
 		return nil, diags
 	}
 
 	attrs := obj.Attributes()
-	stratType := attrs["type"].(types.String).ValueString()
+	ss := &client.ScalingStrategy{Type: attrs["type"].(types.String).ValueString()}
 
-	req := &scalingStrategyRequest{Type: stratType}
-
-	switch stratType {
+	switch ss.Type {
 	case "manual":
-		instanceCount := attrs["instance_count"].(types.Int64)
-		if instanceCount.IsNull() || instanceCount.IsUnknown() {
-			diags.AddError("Invalid Scaling Strategy", "instance_count is required for manual scaling.")
-			return nil, diags
-		}
-		req.Config = manualScalingConfig{
-			InstanceCount: instanceCount.ValueInt64(),
+		ss.Config.InstanceCount = int64Attr(attrs, "instance_count")
+		if ss.Config.InstanceCount == nil {
+			diags.AddAttributeError(path.Root("scaling_strategy").AtName("instance_count"), "Invalid Scaling Strategy", "instance_count is required for manual scaling.")
 		}
 	case "horizontal":
-		minCount := attrs["min_instance_count"].(types.Int64)
-		maxCount := attrs["max_instance_count"].(types.Int64)
-		if minCount.IsNull() || minCount.IsUnknown() || maxCount.IsNull() || maxCount.IsUnknown() {
-			diags.AddError("Invalid Scaling Strategy", "min_instance_count and max_instance_count are required for horizontal scaling.")
-			return nil, diags
+		ss.Config = client.ScalingConfig{
+			MinInstanceCount:         int64Attr(attrs, "min_instance_count"),
+			MaxInstanceCount:         int64Attr(attrs, "max_instance_count"),
+			TargetCPUPercent:         int64Attr(attrs, "target_cpu_percent"),
+			TargetMemoryPercent:      int64Attr(attrs, "target_memory_percent"),
+			ScaleUpIntervalSeconds:   int64Attr(attrs, "scale_up_interval_seconds"),
+			ScaleUpIncrement:         int64Attr(attrs, "scale_up_increment"),
+			ScaleDownIntervalSeconds: int64Attr(attrs, "scale_down_interval_seconds"),
+			ScaleDownIncrement:       int64Attr(attrs, "scale_down_increment"),
 		}
-		cfg := horizontalScalingConfig{
-			MinInstanceCount: minCount.ValueInt64(),
-			MaxInstanceCount: maxCount.ValueInt64(),
+		if ss.Config.MinInstanceCount == nil || ss.Config.MaxInstanceCount == nil {
+			diags.AddAttributeError(path.Root("scaling_strategy"), "Invalid Scaling Strategy", "min_instance_count and max_instance_count are required for horizontal scaling.")
 		}
-		if v := attrs["target_cpu_percent"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.TargetCpuPercent = &val
-		}
-		if v := attrs["target_memory_percent"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.TargetMemoryPercent = &val
-		}
-		if v := attrs["scale_up_interval_seconds"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.ScaleUpIntervalSeconds = &val
-		}
-		if v := attrs["scale_up_increment"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.ScaleUpIncrement = &val
-		}
-		if v := attrs["scale_down_interval_seconds"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.ScaleDownIntervalSeconds = &val
-		}
-		if v := attrs["scale_down_increment"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			cfg.ScaleDownIncrement = &val
-		}
-		req.Config = cfg
-	default:
-		diags.AddError("Invalid Scaling Strategy", fmt.Sprintf("Unknown scaling type: %s. Valid values: manual, horizontal.", stratType))
 	}
 
-	return req, diags
+	return ss, diags
 }
 
-func buildProbeRequest(ctx context.Context, obj types.Object) (*probeRequest, diag.Diagnostics) {
+// buildProbe converts a configured probe to an API probe. Only HTTP GET probes
+// can be written, so exec and tcp_socket are never sent.
+func buildProbe(ctx context.Context, obj types.Object) (*client.Probe, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	if obj.IsNull() || obj.IsUnknown() {
 		return nil, diags
 	}
 
 	attrs := obj.Attributes()
-	req := &probeRequest{}
-
-	// Exec probe
-	if execObj, ok := attrs["exec"].(types.Object); ok && !execObj.IsNull() && !execObj.IsUnknown() {
-		execAttrs := execObj.Attributes()
-		cmdList := execAttrs["command"].(types.List)
-		var commands []string
-		diags.Append(cmdList.ElementsAs(ctx, &commands, false)...)
-		req.Exec = &probeExecRequest{Command: commands}
+	probe := &client.Probe{
+		InitialDelaySeconds: int64Attr(attrs, "initial_delay_seconds"),
+		PeriodSeconds:       int64Attr(attrs, "period_seconds"),
+		TimeoutSeconds:      int64Attr(attrs, "timeout_seconds"),
+		SuccessThreshold:    int64Attr(attrs, "success_threshold"),
+		FailureThreshold:    int64Attr(attrs, "failure_threshold"),
 	}
 
-	// HTTP GET probe
 	if httpObj, ok := attrs["http_get"].(types.Object); ok && !httpObj.IsNull() && !httpObj.IsUnknown() {
 		httpAttrs := httpObj.Attributes()
-		httpReq := &probeHttpGetRequest{}
-		if v := httpAttrs["path"].(types.String); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueString()
-			httpReq.Path = &val
+		probe.HTTPGet = &client.ProbeHTTPGet{
+			Path:   knownString(httpAttrs["path"].(types.String)),
+			Port:   int64Attr(httpAttrs, "port"),
+			Host:   knownString(httpAttrs["host"].(types.String)),
+			Scheme: knownString(httpAttrs["scheme"].(types.String)),
 		}
-		if v := httpAttrs["port"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueInt64()
-			httpReq.Port = &val
-		}
-		if v := httpAttrs["host"].(types.String); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueString()
-			httpReq.Host = &val
-		}
-		if v := httpAttrs["scheme"].(types.String); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueString()
-			httpReq.Scheme = &val
-		}
-		if headersList, ok := httpAttrs["http_headers"].(types.List); ok && !headersList.IsNull() && !headersList.IsUnknown() {
+		if headers, ok := httpAttrs["http_headers"].(types.List); ok && !headers.IsNull() && !headers.IsUnknown() {
 			var headerObjs []types.Object
-			diags.Append(headersList.ElementsAs(ctx, &headerObjs, false)...)
+			diags.Append(headers.ElementsAs(ctx, &headerObjs, false)...)
 			for _, h := range headerObjs {
 				ha := h.Attributes()
-				httpReq.HttpHeaders = append(httpReq.HttpHeaders, httpHeaderRequest{
+				probe.HTTPGet.HTTPHeaders = append(probe.HTTPGet.HTTPHeaders, client.HTTPHeader{
 					Name:  ha["name"].(types.String).ValueString(),
 					Value: ha["value"].(types.String).ValueString(),
 				})
 			}
 		}
-		req.HttpGet = httpReq
 	}
 
-	// TCP socket probe
-	if tcpObj, ok := attrs["tcp_socket"].(types.Object); ok && !tcpObj.IsNull() && !tcpObj.IsUnknown() {
-		tcpAttrs := tcpObj.Attributes()
-		tcpReq := &probeTcpSocketRequest{
-			Port: tcpAttrs["port"].(types.Int64).ValueInt64(),
-		}
-		if v := tcpAttrs["host"].(types.String); !v.IsNull() && !v.IsUnknown() {
-			val := v.ValueString()
-			tcpReq.Host = &val
-		}
-		req.TcpSocket = tcpReq
-	}
-
-	// Timing
-	if v := attrs["initial_delay_seconds"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-		val := v.ValueInt64()
-		req.InitialDelaySeconds = &val
-	}
-	if v := attrs["period_seconds"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-		val := v.ValueInt64()
-		req.PeriodSeconds = &val
-	}
-	if v := attrs["timeout_seconds"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-		val := v.ValueInt64()
-		req.TimeoutSeconds = &val
-	}
-	if v := attrs["success_threshold"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-		val := v.ValueInt64()
-		req.SuccessThreshold = &val
-	}
-	if v := attrs["failure_threshold"].(types.Int64); !v.IsNull() && !v.IsUnknown() {
-		val := v.ValueInt64()
-		req.FailureThreshold = &val
-	}
-
-	return req, diags
+	return probe, diags
 }
 
 // Flatten helpers.
 
-func flattenProcess(ctx context.Context, p *processResponse, model *ApplicationProcessResourceModel) diag.Diagnostics {
+func optionalInt64(v *int64) types.Int64 {
+	if v == nil {
+		return types.Int64Null()
+	}
+	return types.Int64Value(*v)
+}
+
+// nonEmptyString maps nil and "" to null.
+func nonEmptyString(s *string) types.String {
+	if s == nil || *s == "" {
+		return types.StringNull()
+	}
+	return types.StringValue(*s)
+}
+
+func flattenProcess(ctx context.Context, p *client.Process, model *ApplicationProcessResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
 	model.ID = types.StringValue(p.ID)
 	model.Key = types.StringValue(p.Key)
-	model.Type = types.StringValue(p.Type)
-	model.Entrypoint = types.StringValue(p.Entrypoint)
-	model.IsIngressEnabled = types.BoolValue(p.IsIngressEnabled)
-	model.CreatedAt = types.StringValue(p.CreatedAt)
-	model.UpdatedAt = types.StringValue(p.UpdatedAt)
-
+	if p.Type != nil {
+		model.Type = types.StringValue(*p.Type)
+	}
 	if p.DisplayName != nil {
 		model.DisplayName = types.StringValue(*p.DisplayName)
-	}
-	if p.Port != nil {
-		model.Port = types.Int64Value(*p.Port)
-	} else {
-		model.Port = types.Int64Null()
 	}
 	if p.ResourceTypeID != nil {
 		model.ResourceTypeID = types.StringValue(*p.ResourceTypeID)
 	}
-	if p.ResourceTypeName != nil {
-		model.ResourceTypeName = types.StringValue(*p.ResourceTypeName)
-	} else {
-		model.ResourceTypeName = types.StringNull()
-	}
-	if p.CpuLimit != nil {
-		model.CpuLimit = types.Int64Value(*p.CpuLimit)
-	} else {
-		model.CpuLimit = types.Int64Null()
-	}
-	if p.MemoryLimit != nil {
-		model.MemoryLimit = types.Int64Value(*p.MemoryLimit)
-	} else {
-		model.MemoryLimit = types.Int64Null()
-	}
-	if p.IngressProtocol != nil {
-		model.IngressProtocol = types.StringValue(*p.IngressProtocol)
-	} else {
-		model.IngressProtocol = types.StringNull()
-	}
-	if p.Schedule != nil && *p.Schedule != "" {
-		model.Schedule = types.StringValue(*p.Schedule)
-	} else {
-		model.Schedule = types.StringNull()
-	}
-	if p.TimeZone != nil && *p.TimeZone != "" {
-		model.TimeZone = types.StringValue(*p.TimeZone)
-	} else {
-		model.TimeZone = types.StringNull()
-	}
-	if p.JobStartPolicy != nil && *p.JobStartPolicy != "" {
-		model.JobStartPolicy = types.StringValue(*p.JobStartPolicy)
-	} else {
-		model.JobStartPolicy = types.StringNull()
-	}
-	if p.InternalHostname != nil {
-		model.InternalHostname = types.StringValue(*p.InternalHostname)
-	} else {
-		model.InternalHostname = types.StringNull()
+	model.Entrypoint = types.StringValue(p.Entrypoint)
+	model.Port = optionalInt64(p.Port)
+	model.IsIngressEnabled = types.BoolValue(p.IsIngressEnabled)
+	model.IngressProtocol = optionalString(p.IngressProtocol)
+	model.ResourceTypeName = optionalString(p.ResourceTypeName)
+	model.CpuLimit = optionalInt64(p.CPULimit)
+	model.MemoryLimit = optionalInt64(p.MemoryLimit)
+	model.Schedule = nonEmptyString(p.Schedule)
+	model.TimeZone = nonEmptyString(p.TimeZone)
+	model.ConcurrencyPolicy = optionalString(p.ConcurrencyPolicy)
+	model.JobStartPolicy = nonEmptyString(p.JobStartPolicy)
+	model.InternalHostname = optionalString(p.InternalHostname)
+	model.CreatedAt = types.StringValue(p.CreatedAt)
+	model.UpdatedAt = types.StringValue(p.UpdatedAt)
+
+	// The API reports an unset limit as null; keep a configured 0, which means the same.
+	if p.ActiveDeadlineSeconds != nil || model.ActiveDeadlineSeconds.IsUnknown() || model.ActiveDeadlineSeconds.ValueInt64() != 0 {
+		model.ActiveDeadlineSeconds = optionalInt64(p.ActiveDeadlineSeconds)
 	}
 
-	// Scaling strategy
 	if p.ScalingStrategy != nil {
-		ssAttrs := map[string]attr.Value{
-			"type": types.StringValue(p.ScalingStrategy.Type),
-		}
 		cfg := p.ScalingStrategy.Config
-		setOptionalInt64 := func(key string, val *int64) {
-			if val != nil {
-				ssAttrs[key] = types.Int64Value(*val)
-			} else {
-				ssAttrs[key] = types.Int64Null()
-			}
-		}
-		setOptionalInt64("instance_count", cfg.InstanceCount)
-		setOptionalInt64("min_instance_count", cfg.MinInstanceCount)
-		setOptionalInt64("max_instance_count", cfg.MaxInstanceCount)
-		setOptionalInt64("target_cpu_percent", cfg.TargetCpuPercent)
-		setOptionalInt64("target_memory_percent", cfg.TargetMemoryPercent)
-		setOptionalInt64("scale_up_interval_seconds", cfg.ScaleUpIntervalSeconds)
-		setOptionalInt64("scale_up_increment", cfg.ScaleUpIncrement)
-		setOptionalInt64("scale_down_interval_seconds", cfg.ScaleDownIntervalSeconds)
-		setOptionalInt64("scale_down_increment", cfg.ScaleDownIncrement)
-
-		obj, d := types.ObjectValue(scalingStrategyAttrTypes, ssAttrs)
+		obj, d := types.ObjectValue(scalingStrategyAttrTypes, map[string]attr.Value{
+			"type":                        types.StringValue(p.ScalingStrategy.Type),
+			"instance_count":              optionalInt64(cfg.InstanceCount),
+			"min_instance_count":          optionalInt64(cfg.MinInstanceCount),
+			"max_instance_count":          optionalInt64(cfg.MaxInstanceCount),
+			"target_cpu_percent":          optionalInt64(cfg.TargetCPUPercent),
+			"target_memory_percent":       optionalInt64(cfg.TargetMemoryPercent),
+			"scale_up_interval_seconds":   optionalInt64(cfg.ScaleUpIntervalSeconds),
+			"scale_up_increment":          optionalInt64(cfg.ScaleUpIncrement),
+			"scale_down_interval_seconds": optionalInt64(cfg.ScaleDownIntervalSeconds),
+			"scale_down_increment":        optionalInt64(cfg.ScaleDownIncrement),
+		})
 		diags.Append(d...)
 		model.ScalingStrategy = obj
 	} else {
 		model.ScalingStrategy = types.ObjectNull(scalingStrategyAttrTypes)
 	}
 
-	// Probes
 	lp, d := flattenProbe(ctx, p.LivenessProbe)
 	diags.Append(d...)
 	model.LivenessProbe = lp
@@ -1021,58 +874,39 @@ func flattenProcess(ctx context.Context, p *processResponse, model *ApplicationP
 	return diags
 }
 
-func flattenProbe(_ context.Context, p *probeResponse) (types.Object, diag.Diagnostics) {
+func flattenProbe(ctx context.Context, p *client.Probe) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 
-	if p == nil {
+	// The API returns {} for a process without the probe.
+	if p == nil || reflect.ValueOf(*p).IsZero() {
 		return types.ObjectNull(probeAttrTypes), diags
 	}
 
-	attrs := map[string]attr.Value{}
-
-	// Exec
-	if p.Exec != nil {
-		cmdVals := make([]attr.Value, len(p.Exec.Command))
-		for i, c := range p.Exec.Command {
-			cmdVals[i] = types.StringValue(c)
-		}
-		cmdList, d := types.ListValue(types.StringType, cmdVals)
-		diags.Append(d...)
-		execObj, d := types.ObjectValue(probeExecAttrTypes, map[string]attr.Value{
-			"command": cmdList,
-		})
-		diags.Append(d...)
-		attrs["exec"] = execObj
-	} else {
-		attrs["exec"] = types.ObjectNull(probeExecAttrTypes)
+	attrs := map[string]attr.Value{
+		"exec":                  types.ObjectNull(probeExecAttrTypes),
+		"http_get":              types.ObjectNull(probeHttpGetAttrTypes),
+		"tcp_socket":            types.ObjectNull(probeTcpSocketAttrTypes),
+		"initial_delay_seconds": optionalInt64(p.InitialDelaySeconds),
+		"period_seconds":        optionalInt64(p.PeriodSeconds),
+		"timeout_seconds":       optionalInt64(p.TimeoutSeconds),
+		"success_threshold":     optionalInt64(p.SuccessThreshold),
+		"failure_threshold":     optionalInt64(p.FailureThreshold),
 	}
 
-	// HTTP GET
-	if p.HttpGet != nil {
-		httpAttrs := map[string]attr.Value{}
-		if p.HttpGet.Path != nil {
-			httpAttrs["path"] = types.StringValue(*p.HttpGet.Path)
-		} else {
-			httpAttrs["path"] = types.StringNull()
-		}
-		if p.HttpGet.Port != nil {
-			httpAttrs["port"] = types.Int64Value(*p.HttpGet.Port)
-		} else {
-			httpAttrs["port"] = types.Int64Null()
-		}
-		if p.HttpGet.Host != nil {
-			httpAttrs["host"] = types.StringValue(*p.HttpGet.Host)
-		} else {
-			httpAttrs["host"] = types.StringNull()
-		}
-		if p.HttpGet.Scheme != nil {
-			httpAttrs["scheme"] = types.StringValue(*p.HttpGet.Scheme)
-		} else {
-			httpAttrs["scheme"] = types.StringNull()
-		}
-		if len(p.HttpGet.HttpHeaders) > 0 {
-			headerObjs := make([]attr.Value, len(p.HttpGet.HttpHeaders))
-			for i, h := range p.HttpGet.HttpHeaders {
+	if p.Exec != nil {
+		cmdList, d := types.ListValueFrom(ctx, types.StringType, p.Exec.Command)
+		diags.Append(d...)
+		execObj, d := types.ObjectValue(probeExecAttrTypes, map[string]attr.Value{"command": cmdList})
+		diags.Append(d...)
+		attrs["exec"] = execObj
+	}
+
+	if p.HTTPGet != nil {
+		headerType := types.ObjectType{AttrTypes: httpHeaderAttrTypes}
+		headers := types.ListNull(headerType)
+		if len(p.HTTPGet.HTTPHeaders) > 0 {
+			headerObjs := make([]attr.Value, len(p.HTTPGet.HTTPHeaders))
+			for i, h := range p.HTTPGet.HTTPHeaders {
 				obj, d := types.ObjectValue(httpHeaderAttrTypes, map[string]attr.Value{
 					"name":  types.StringValue(h.Name),
 					"value": types.StringValue(h.Value),
@@ -1080,167 +914,31 @@ func flattenProbe(_ context.Context, p *probeResponse) (types.Object, diag.Diagn
 				diags.Append(d...)
 				headerObjs[i] = obj
 			}
-			headersList, d := types.ListValue(types.ObjectType{AttrTypes: httpHeaderAttrTypes}, headerObjs)
+			list, d := types.ListValue(headerType, headerObjs)
 			diags.Append(d...)
-			httpAttrs["http_headers"] = headersList
-		} else {
-			httpAttrs["http_headers"] = types.ListNull(types.ObjectType{AttrTypes: httpHeaderAttrTypes})
+			headers = list
 		}
-		httpObj, d := types.ObjectValue(probeHttpGetAttrTypes, httpAttrs)
+		httpObj, d := types.ObjectValue(probeHttpGetAttrTypes, map[string]attr.Value{
+			"path":         optionalString(p.HTTPGet.Path),
+			"port":         optionalInt64(p.HTTPGet.Port),
+			"host":         optionalString(p.HTTPGet.Host),
+			"scheme":       optionalString(p.HTTPGet.Scheme),
+			"http_headers": headers,
+		})
 		diags.Append(d...)
 		attrs["http_get"] = httpObj
-	} else {
-		attrs["http_get"] = types.ObjectNull(probeHttpGetAttrTypes)
 	}
 
-	// TCP Socket
-	if p.TcpSocket != nil {
-		tcpAttrs := map[string]attr.Value{
-			"port": types.Int64Value(p.TcpSocket.Port),
-		}
-		if p.TcpSocket.Host != nil {
-			tcpAttrs["host"] = types.StringValue(*p.TcpSocket.Host)
-		} else {
-			tcpAttrs["host"] = types.StringNull()
-		}
-		tcpObj, d := types.ObjectValue(probeTcpSocketAttrTypes, tcpAttrs)
+	if p.TCPSocket != nil {
+		tcpObj, d := types.ObjectValue(probeTcpSocketAttrTypes, map[string]attr.Value{
+			"host": optionalString(p.TCPSocket.Host),
+			"port": types.Int64Value(p.TCPSocket.Port),
+		})
 		diags.Append(d...)
 		attrs["tcp_socket"] = tcpObj
-	} else {
-		attrs["tcp_socket"] = types.ObjectNull(probeTcpSocketAttrTypes)
 	}
-
-	// Timing
-	setOptionalInt64 := func(key string, val *int64) {
-		if val != nil {
-			attrs[key] = types.Int64Value(*val)
-		} else {
-			attrs[key] = types.Int64Null()
-		}
-	}
-	setOptionalInt64("initial_delay_seconds", p.InitialDelaySeconds)
-	setOptionalInt64("period_seconds", p.PeriodSeconds)
-	setOptionalInt64("timeout_seconds", p.TimeoutSeconds)
-	setOptionalInt64("success_threshold", p.SuccessThreshold)
-	setOptionalInt64("failure_threshold", p.FailureThreshold)
 
 	obj, d := types.ObjectValue(probeAttrTypes, attrs)
 	diags.Append(d...)
 	return obj, diags
-}
-
-// HTTP methods.
-
-func (r *applicationProcessResource) doCreateProcess(ctx context.Context, appID string, input *createProcessRequest) (*processResponse, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling create process request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, r.client.BaseURL+"/applications/"+appID+"/processes", bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusCreated && httpResp.StatusCode != http.StatusOK {
-		return nil, parseHTTPError(httpResp)
-	}
-
-	var process processResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&process); err != nil {
-		return nil, fmt.Errorf("decoding process response: %w", err)
-	}
-
-	return &process, nil
-}
-
-func (r *applicationProcessResource) doGetProcess(ctx context.Context, appID, processID string) (*processResponse, error) {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, r.client.BaseURL+"/applications/"+appID+"/processes/"+processID, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, parseHTTPError(httpResp)
-	}
-
-	var process processResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&process); err != nil {
-		return nil, fmt.Errorf("decoding process response: %w", err)
-	}
-
-	return &process, nil
-}
-
-func (r *applicationProcessResource) doUpdateProcess(ctx context.Context, appID, processID string, input *updateProcessRequest) (*processResponse, error) {
-	body, err := json.Marshal(input)
-	if err != nil {
-		return nil, fmt.Errorf("marshaling update process request: %w", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPatch, r.client.BaseURL+"/applications/"+appID+"/processes/"+processID, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK {
-		return nil, parseHTTPError(httpResp)
-	}
-
-	var process processResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&process); err != nil {
-		return nil, fmt.Errorf("decoding process response: %w", err)
-	}
-
-	return &process, nil
-}
-
-func (r *applicationProcessResource) doDeleteProcess(ctx context.Context, appID, processID string) error {
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, r.client.BaseURL+"/applications/"+appID+"/processes/"+processID, nil)
-	if err != nil {
-		return err
-	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		return err
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
-		return parseHTTPError(httpResp)
-	}
-
-	return nil
-}
-
-// parseHTTPError parses an error response and returns a structured APIError.
-func parseHTTPError(resp *http.Response) error {
-	var apiErr client.APIError
-	if err := json.NewDecoder(resp.Body).Decode(&apiErr); err != nil {
-		return &client.APIError{
-			StatusCode: resp.StatusCode,
-			Message:    fmt.Sprintf("unexpected status code %d", resp.StatusCode),
-		}
-	}
-	apiErr.StatusCode = resp.StatusCode
-	return &apiErr
 }

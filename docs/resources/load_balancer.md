@@ -13,22 +13,14 @@ Manages a Sevalla load balancer.
 ## Example Usage
 
 ```terraform
-# Standard load balancer
+# Load balancer with round-robin or weighted routing
 resource "sevalla_load_balancer" "example" {
   display_name = "my-load-balancer"
-  cluster_id   = data.sevalla_clusters.all.clusters[0].id
-  port         = 443
-  protocol     = "HTTPS"
-  algorithm    = "round-robin"
 }
 
-# Geo-routed load balancer
+# Load balancer that routes by client location
 resource "sevalla_load_balancer" "geo" {
   display_name = "my-geo-lb"
-  cluster_id   = data.sevalla_clusters.all.clusters[0].id
-  port         = 443
-  protocol     = "HTTPS"
-  algorithm    = "round-robin"
   type         = "GEO"
 }
 ```
@@ -38,16 +30,12 @@ resource "sevalla_load_balancer" "geo" {
 
 ### Required
 
-- `algorithm` (String) The load balancing algorithm.
-- `cluster_id` (String) The cluster where the load balancer is deployed. Cannot be changed after creation.
-- `display_name` (String) The display name of the load balancer.
-- `port` (Number) The port the load balancer listens on. Cannot be changed after creation.
-- `protocol` (String) The protocol for the load balancer. Cannot be changed after creation.
+- `display_name` (String) The display name of the load balancer (2-64 characters).
 
 ### Optional
 
-- `project_id` (String) The project ID to associate with this load balancer.
-- `type` (String) The routing type. Valid values: DEFAULT, GEO.
+- `project_id` (String) The ID of the project to group the load balancer under. Removing it removes the load balancer from the project.
+- `type` (String) The routing type: `DEFAULT` (round-robin or weighted routing) or `GEO` (routing by client location). Defaults to `DEFAULT`.
 
 ### Read-Only
 
@@ -55,7 +43,6 @@ resource "sevalla_load_balancer" "geo" {
 - `created_at` (String) The timestamp when the load balancer was created.
 - `id` (String) The unique identifier of the load balancer.
 - `name` (String) The system-generated name of the load balancer.
-- `status` (String) The current status of the load balancer.
 - `updated_at` (String) The timestamp when the load balancer was last updated.
 
 ## Import

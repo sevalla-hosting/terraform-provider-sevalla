@@ -24,19 +24,30 @@ resource "sevalla_pipeline" "example" {
 
 ### Required
 
-- `display_name` (String) The display name of the pipeline.
-- `type` (String) The type of the pipeline (trunk or branch).
+- `display_name` (String) The display name of the pipeline (1-255 characters).
+- `type` (String) The pipeline type: `trunk` (all stages share the repository and branch configuration) or `branch` (each stage can have its own branch).
 
 ### Optional
 
-- `project_id` (String) The project ID associated with the pipeline.
+- `project_id` (String) The ID of the project to group the pipeline under. Adding a pipeline to a project also moves the applications in its stages into the project, and removing it removes them.
 
 ### Read-Only
 
 - `company_id` (String) The company ID that owns the pipeline.
 - `created_at` (String) The timestamp when the pipeline was created.
 - `id` (String) The unique identifier of the pipeline.
+- `stages` (Attributes List) The stages of the pipeline ordered by position, including the Dev and Production stages the API creates with the pipeline. (see [below for nested schema](#nestedatt--stages))
 - `updated_at` (String) The timestamp when the pipeline was last updated.
+
+<a id="nestedatt--stages"></a>
+### Nested Schema for `stages`
+
+Read-Only:
+
+- `display_name` (String) The display name of the stage.
+- `id` (String) The unique identifier of the stage.
+- `order` (Number) The position of the stage, starting from 0.
+- `type` (String) The stage type: `standard`, `prod` or `preview`.
 
 ## Import
 

@@ -40,7 +40,7 @@ func (r *pipelineStageApplicationResource) Metadata(_ context.Context, req resou
 
 func (r *pipelineStageApplicationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Attaches an application to a pipeline stage in Sevalla.",
+		Description: "Attaches an application to a pipeline stage in Sevalla. The API does not list the applications of a stage, so removing the application from the stage outside Terraform is not detected.",
 		Attributes: map[string]schema.Attribute{
 			"pipeline_id": schema.StringAttribute{
 				Description: "The ID of the pipeline.",
@@ -134,6 +134,16 @@ func (r *pipelineStageApplicationResource) Read(ctx context.Context, req resourc
 		return
 	}
 
+	// The API does not list the applications of a stage, so only check that the application still exists.
+	if _, err := r.client.GetApplication(ctx, state.ApplicationID.ValueString()); err != nil {
+		if client.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Error Reading Pipeline Stage Application", err.Error())
+		return
+	}
+
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -152,7 +162,7 @@ func (r *pipelineStageApplicationResource) Delete(ctx context.Context, req resou
 	}
 
 	err := r.client.RemovePipelineStageApp(ctx, state.PipelineID.ValueString(), state.StageID.ValueString(), state.ApplicationID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Pipeline Stage Application", err.Error())
 		return
 	}

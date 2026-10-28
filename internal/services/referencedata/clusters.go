@@ -28,6 +28,7 @@ type ClusterModel struct {
 	Name        types.String `tfsdk:"name"`
 	DisplayName types.String `tfsdk:"display_name"`
 	Location    types.String `tfsdk:"location"`
+	Provider    types.String `tfsdk:"provider"`
 }
 
 func NewClustersDataSource() datasource.DataSource {
@@ -60,7 +61,11 @@ func (d *clustersDataSource) Schema(_ context.Context, _ datasource.SchemaReques
 							Computed:    true,
 						},
 						"location": schema.StringAttribute{
-							Description: "The geographic location of the cluster.",
+							Description: "The cloud region where the cluster is located.",
+							Computed:    true,
+						},
+						"provider": schema.StringAttribute{
+							Description: "The cloud provider running the cluster: `gcp` (Google Cloud Platform) or `oci` (Oracle Cloud Infrastructure).",
 							Computed:    true,
 						},
 					},
@@ -113,6 +118,7 @@ func (d *clustersDataSource) Read(ctx context.Context, _ datasource.ReadRequest,
 			Name:        types.StringValue(cluster.Name),
 			DisplayName: displayName,
 			Location:    types.StringValue(cluster.Location),
+			Provider:    types.StringValue(cluster.Provider),
 		}
 	}
 

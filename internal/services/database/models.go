@@ -41,14 +41,16 @@ type DatabaseResourceModel struct {
 
 // DatabaseListItemModel is the Terraform state model for items in the sevalla_databases data source.
 type DatabaseListItemModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	DisplayName types.String `tfsdk:"display_name"`
-	Type        types.String `tfsdk:"type"`
-	Status      types.String `tfsdk:"status"`
-	IsSuspended types.Bool   `tfsdk:"is_suspended"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	DisplayName      types.String `tfsdk:"display_name"`
+	Type             types.String `tfsdk:"type"`
+	Version          types.String `tfsdk:"version"`
+	ResourceTypeName types.String `tfsdk:"resource_type_name"`
+	Status           types.String `tfsdk:"status"`
+	IsSuspended      types.Bool   `tfsdk:"is_suspended"`
+	CreatedAt        types.String `tfsdk:"created_at"`
+	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
 
 // DatabaseListDataSourceModel is the top-level model for the sevalla_databases data source.
@@ -57,8 +59,6 @@ type DatabaseListDataSourceModel struct {
 }
 
 // flattenDatabase maps a client.Database to the Terraform resource model.
-// The model parameter is used to preserve values that are not returned by the API
-// (e.g., cluster_id).
 func flattenDatabase(_ context.Context, db *client.Database, model *DatabaseResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
@@ -80,7 +80,14 @@ func flattenDatabase(_ context.Context, db *client.Database, model *DatabaseReso
 	model.ClusterDisplayName = optionalString(db.ClusterDisplayName)
 	model.ClusterLocation = optionalString(db.ClusterLocation)
 	model.ResourceTypeName = optionalString(db.ResourceTypeName)
-	model.DbName = optionalString(db.DbName)
+	// Redis and Valkey ignore db_name and db_user (reported as "0" and null),
+	// so keep the configured values for them.
+	if !isKeyValueStore(db.Type) || model.DbName.IsNull() || model.DbName.IsUnknown() {
+		model.DbName = optionalString(db.DbName)
+	}
+	if !isKeyValueStore(db.Type) || model.DbUser.IsUnknown() {
+		model.DbUser = optionalString(db.DbUser)
+	}
 	model.InternalHostname = optionalString(db.InternalHostname)
 	model.ExternalHostname = optionalString(db.ExternalHostname)
 
@@ -149,9 +156,9 @@ func buildUpdateRequest(plan *DatabaseResourceModel, state *DatabaseResourceMode
 		v := plan.ResourceTypeID.ValueString()
 		req.ResourceTypeID = &v
 	}
-	if !plan.ProjectID.Equal(state.ProjectID) {
-		v := plan.ProjectID.ValueString()
-		req.ProjectID = &v
+	if !plan.ProjectID.IsUnknown() && !plan.ProjectID.Equal(state.ProjectID) {
+		// A null plan value is sent as JSON null to remove the project assignment.
+		req.ProjectID = client.NullableOf(plan.ProjectID.ValueStringPointer())
 	}
 
 	return req

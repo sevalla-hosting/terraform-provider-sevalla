@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -68,8 +70,9 @@ func (r *databaseInternalConnectionResource) Schema(_ context.Context, _ resourc
 				},
 			},
 			"target_type": schema.StringAttribute{
-				Description: "The type of the target resource. Valid values: app, database.",
+				Description: "The type of the target resource. Valid values: `app`, `database`.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("app", "database")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
@@ -130,6 +133,8 @@ func (r *databaseInternalConnectionResource) Create(ctx context.Context, req res
 	}
 
 	plan.ID = types.StringValue(conn.ID)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("database_id"), dbID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), conn.ID)...)
 
 	// Create response only returns ID, so read to get all fields.
 	connections, err := r.client.ListInternalConnections(ctx, dbID)
@@ -146,9 +151,11 @@ func (r *databaseInternalConnectionResource) Create(ctx context.Context, req res
 		}
 	}
 
-	if found != nil {
-		flattenInternalConnection(found, &plan)
+	if found == nil {
+		resp.Diagnostics.AddError("Error Reading Database Internal Connection After Create", "Internal connection "+conn.ID+" was created but is not listed.")
+		return
 	}
+	flattenInternalConnection(found, &plan)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
@@ -204,7 +211,7 @@ func (r *databaseInternalConnectionResource) Delete(ctx context.Context, req res
 	}
 
 	err := r.client.DeleteInternalConnection(ctx, state.DatabaseID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Database Internal Connection", err.Error())
 		return
 	}

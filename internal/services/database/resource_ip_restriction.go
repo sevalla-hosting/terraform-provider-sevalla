@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 var (
@@ -51,17 +55,19 @@ func (r *databaseIPRestrictionResource) Schema(_ context.Context, _ resource.Sch
 				},
 			},
 			"type": schema.StringAttribute{
-				Description: "The restriction type. Valid values: allow, deny.",
+				Description: "The restriction type: `allow` lets only the listed IPs connect externally, `deny` blocks them.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("allow", "deny")},
 			},
 			"is_enabled": schema.BoolAttribute{
 				Description: "Whether IP restriction is enabled.",
 				Required:    true,
 			},
 			"ip_list": schema.ListAttribute{
-				Description: "List of IP addresses or CIDR ranges.",
+				Description: "Public IP addresses or CIDR ranges the restriction applies to (at most 500).",
 				Required:    true,
 				ElementType: types.StringType,
+				Validators:  []validator.List{listvalidator.SizeAtMost(500)},
 			},
 		},
 	}
@@ -165,7 +171,7 @@ func (r *databaseIPRestrictionResource) Delete(ctx context.Context, req resource
 	}
 
 	_, err := r.client.UpdateDatabaseIPRestriction(ctx, state.DatabaseID.ValueString(), input)
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Database IP Restriction", err.Error())
 		return
 	}
@@ -201,7 +207,11 @@ func flattenDBIPRestriction(ctx context.Context, output *client.IPRestriction, m
 	model.Type = types.StringValue(output.Type)
 	model.IsEnabled = types.BoolValue(output.IsEnabled)
 
-	ipList, d := types.ListValueFrom(ctx, types.StringType, output.IPList)
+	var prior []string
+	if !model.IPList.IsNull() && !model.IPList.IsUnknown() {
+		diags.Append(model.IPList.ElementsAs(ctx, &prior, false)...)
+	}
+	ipList, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(prior, output.IPList))
 	diags.Append(d...)
 	model.IPList = ipList
 

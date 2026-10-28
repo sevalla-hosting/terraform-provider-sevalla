@@ -49,30 +49,33 @@ resource "sevalla_application" "docker" {
 
 - `cluster_id` (String) The cluster where the application is deployed. Cannot be changed after creation.
 - `display_name` (String) The display name of the application (2-64 characters).
-- `source` (String) The source type of the application. Valid values: privateGit, publicGit, dockerImage.
+- `source` (String) The source type of the application. Valid values: `privateGit`, `publicGit`, `dockerImage`.
 
 ### Optional
 
-- `allow_deploy_paths` (List of String) List of paths that trigger a deployment when changed.
+- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_cache_enabled` (Boolean) Whether the build cache is enabled.
 - `build_path` (String) The build path within the repository.
-- `build_type` (String) The build type. Valid values: dockerfile, pack, nixpacks.
-- `buildpacks` (Attributes List) List of buildpack configurations for the application. (see [below for nested schema](#nestedatt--buildpacks))
-- `default_branch` (String) The default branch to deploy from.
-- `docker_context` (String) The Docker build context path.
+- `build_type` (String) The build type. Valid values: `dockerfile`, `pack` (Cloud Native Buildpacks), `nixpacks`, `railpack`. Defaults to `dockerfile`.
+- `buildpacks` (Attributes List) Custom buildpacks when `build_type` is `pack`. Null for other build types. (see [below for nested schema](#nestedatt--buildpacks))
+- `cdn_enabled` (Boolean) Whether the CDN is enabled for the application.
+- `default_branch` (String) The default branch to deploy from. Defaults to the repository's default branch.
+- `docker_context` (String) The Docker build context path when `build_type` is `dockerfile`. Defaults to `.`. Null for other build types.
 - `docker_image` (String) The Docker image to deploy.
 - `docker_registry_credential_id` (String) The ID of the Docker registry credential to use.
-- `dockerfile_path` (String) The path to the Dockerfile.
-- `git_type` (String) The Git provider type. Valid values: github, bitbucket, gitlab.
-- `hibernate_after_seconds` (Number) Number of seconds of inactivity before the application hibernates.
+- `dockerfile_path` (String) The path to the Dockerfile when `build_type` is `dockerfile`. Defaults to `Dockerfile`. Null for other build types.
+- `edge_cache_enabled` (Boolean) Whether edge caching is enabled for the application.
+- `git_lfs_enabled` (Boolean) Whether Git LFS objects are fetched during the source checkout step. Enabled by default.
+- `git_type` (String) The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`.
+- `hibernate_after_seconds` (Number) Number of seconds of inactivity before the application hibernates (1-604800).
 - `hibernation_enabled` (Boolean) Whether hibernation is enabled for the application.
-- `ignore_deploy_paths` (List of String) List of paths to ignore when determining whether to trigger a deployment.
-- `nixpacks_version` (String) The Nixpacks version to use for builds.
-- `pack_builder` (String) The Cloud Native Buildpack builder to use.
-- `project_id` (String) The project ID to associate with this application.
+- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.
+- `nixpacks_version` (String) The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to the platform version.
+- `pack_builder` (String) The Cloud Native Buildpacks builder image when `build_type` is `pack`. Valid values: `heroku/builder:22`, `heroku/builder:24`.
+- `project_id` (String) The ID of the project to group the application under. Changing it moves the application to the new project; removing it from the configuration leaves the application in its current project.
 - `repo_url` (String) The repository URL for the application source.
-- `wait_for_checks` (Boolean) Whether to wait for checks before deploying.
+- `wait_for_checks` (Boolean, Deprecated) Has no effect.
 
 ### Read-Only
 
@@ -90,10 +93,10 @@ resource "sevalla_application" "docker" {
 <a id="nestedatt--buildpacks"></a>
 ### Nested Schema for `buildpacks`
 
-Required:
+Optional:
 
-- `order` (Number) The order of the buildpack.
-- `source` (String) The source of the buildpack.
+- `order` (Number) The position of the buildpack in the build (0-20). Required.
+- `source` (String) The buildpack ID or URL. Required.
 
 ## Import
 

@@ -25,18 +25,18 @@ resource "sevalla_object_storage" "example" {
 
 ### Required
 
-- `display_name` (String) The display name of the object storage.
+- `display_name` (String) The display name of the object storage (2-64 characters).
 
 ### Optional
 
-- `jurisdiction` (String) Data residency jurisdiction. Valid values: default, eu, fedramp. Defaults to default.
-- `location` (String) Geographic hint for where most data access occurs. Valid values: apac, eeur, enam, oc, weur, wnam. Defaults to enam.
-- `project_id` (String) The project to group this bucket under.
-- `public_access` (Boolean) Whether to enable a public CDN domain for this bucket. Defaults to false.
+- `jurisdiction` (String) Data residency jurisdiction. Valid values: `default`, `eu`, `fedramp`. Defaults to `default`. Changing this creates a new bucket.
+- `location` (String) Geographic hint for where most data access occurs. Valid values: `apac`, `eeur`, `enam`, `oc`, `weur`, `wnam`. Defaults to `enam`. Changing this creates a new bucket.
+- `project_id` (String) The ID of the project to group the bucket under. Removing it removes the bucket from the project.
+- `public_access` (Boolean) Whether the bucket has a public CDN domain. Defaults to `false`.
 
 ### Read-Only
 
-- `access_key` (String, Sensitive) The access key for S3-compatible API authentication. Only returned on create.
+- `access_key` (String, Sensitive) The access key ID for the S3-compatible API. The API only returns it when the bucket is created, so it is null after an import.
 - `bucket_name` (String) The bucket name.
 - `company_id` (String) The company ID that owns the object storage.
 - `created_at` (String) The timestamp when the object storage was created.
@@ -44,7 +44,8 @@ resource "sevalla_object_storage" "example" {
 - `endpoint` (String) The S3-compatible API endpoint URL for the object storage.
 - `id` (String) The unique identifier of the object storage.
 - `name` (String) The system-generated name of the object storage.
-- `secret_key` (String, Sensitive) The secret key for S3-compatible API authentication. Only returned on create.
+- `secret_key` (String, Sensitive) The secret access key for the S3-compatible API. The API only returns it when the bucket is created, so it is null after an import.
+- `status` (String) The lifecycle status of the bucket: `active`, `deleting` or `deletionFailed`.
 - `updated_at` (String) The timestamp when the object storage was last updated.
 
 ## Import

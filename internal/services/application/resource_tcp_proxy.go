@@ -1,22 +1,25 @@
 package application
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
+	"time"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
+
+// portReadyTimeout bounds how long Create waits for a TCP proxy or private port.
+const portReadyTimeout = 10 * time.Minute
 
 var (
 	_ resource.Resource                = &applicationTCPProxyResource{}
@@ -40,22 +43,6 @@ type ApplicationTCPProxyResourceModel struct {
 	UpdatedAt     types.String `tfsdk:"updated_at"`
 }
 
-type createTCPProxyRequest struct {
-	ProcessID string `json:"process_id"`
-	Port      int64  `json:"port"`
-}
-
-type tcpProxyResponse struct {
-	ID           string  `json:"id"`
-	ProcessID    *string `json:"process_id"`
-	Port         int64   `json:"port"`
-	ExternalPort int64   `json:"external_port"`
-	Hostname     *string `json:"hostname"`
-	Status       *string `json:"status"`
-	CreatedAt    *string `json:"created_at"`
-	UpdatedAt    *string `json:"updated_at"`
-}
-
 func NewTCPProxyResource() resource.Resource {
 	return &applicationTCPProxyResource{}
 }
@@ -66,7 +53,7 @@ func (r *applicationTCPProxyResource) Metadata(_ context.Context, req resource.M
 
 func (r *applicationTCPProxyResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages a TCP proxy for a Sevalla application.",
+		Description: "Manages a TCP proxy that exposes a port of a Sevalla application process to the internet.",
 		Attributes: map[string]schema.Attribute{
 			"id": schema.StringAttribute{
 				Description: "The unique identifier of the TCP proxy.",
@@ -83,32 +70,30 @@ func (r *applicationTCPProxyResource) Schema(_ context.Context, _ resource.Schem
 				},
 			},
 			"process_id": schema.StringAttribute{
-				Description: "The ID of the process this TCP proxy belongs to.",
+				Description: "The ID of the process to attach the TCP proxy to.",
 				Required:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.RequiresReplace(),
 				},
 			},
 			"port": schema.Int64Attribute{
-				Description: "The internal port number.",
+				Description: "The internal container port to expose (1-65535).",
 				Required:    true,
+				Validators:  []validator.Int64{int64validator.Between(1, 65535)},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.RequiresReplace(),
 				},
 			},
 			"external_port": schema.Int64Attribute{
-				Description: "The external port number assigned by the platform.",
+				Description: "The public port to connect to. It can change once when the proxy moves behind the external proxy, so read it together with `hostname`.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
 			},
 			"hostname": schema.StringAttribute{
-				Description: "The hostname for the TCP proxy.",
+				Description: "The public hostname to connect to.",
 				Computed:    true,
 			},
 			"status": schema.StringAttribute{
-				Description: "The current status of the TCP proxy.",
+				Description: "The status of the TCP proxy: `creating`, `ready`, `failed` or `deleting`.",
 				Computed:    true,
 			},
 			"created_at": schema.StringAttribute{
@@ -151,43 +136,37 @@ func (r *applicationTCPProxyResource) Create(ctx context.Context, req resource.C
 	}
 
 	appID := plan.ApplicationID.ValueString()
-	createReq := createTCPProxyRequest{
+	proxy, err := r.client.CreateTCPProxy(ctx, appID, &client.CreatePortRequest{
 		ProcessID: plan.ProcessID.ValueString(),
 		Port:      plan.Port.ValueInt64(),
-	}
-
-	body, err := json.Marshal(createReq)
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Application TCP Proxy", err.Error())
+		resp.Diagnostics.AddError("Error Creating TCP Proxy", err.Error())
 		return
 	}
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("application_id"), appID)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), proxy.ID)...)
 
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, r.client.BaseURL+"/applications/"+appID+"/tcp-proxies", bytes.NewReader(body))
+	err = client.Poll(ctx, portReadyTimeout, func() (bool, error) {
+		found, err := r.find(ctx, appID, proxy.ID)
+		if err != nil || found == nil {
+			return false, err
+		}
+		proxy = found
+		switch proxy.Status {
+		case "ready":
+			return true, nil
+		case "failed", "deleting":
+			return false, fmt.Errorf("TCP proxy %s is %s", proxy.ID, proxy.Status)
+		}
+		return false, nil
+	})
 	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Application TCP Proxy", err.Error())
+		resp.Diagnostics.AddError("Error Waiting for TCP Proxy", err.Error())
 		return
 	}
 
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Creating Application TCP Proxy", err.Error())
-		return
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusCreated && httpResp.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Error Creating Application TCP Proxy", parseHTTPError(httpResp).Error())
-		return
-	}
-
-	var proxy tcpProxyResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&proxy); err != nil {
-		resp.Diagnostics.AddError("Error Creating Application TCP Proxy", fmt.Sprintf("decoding response: %s", err))
-		return
-	}
-
-	flattenTCPProxy(&proxy, &plan)
-
+	flattenTCPProxy(proxy, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -198,45 +177,41 @@ func (r *applicationTCPProxyResource) Read(ctx context.Context, req resource.Rea
 		return
 	}
 
-	appID := state.ApplicationID.ValueString()
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, r.client.BaseURL+"/applications/"+appID+"/tcp-proxies/"+state.ID.ValueString(), nil)
+	proxy, err := r.find(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
 	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Application TCP Proxy", err.Error())
+		if client.IsNotFound(err) {
+			resp.State.RemoveResource(ctx)
+			return
+		}
+		resp.Diagnostics.AddError("Error Reading TCP Proxy", err.Error())
 		return
 	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Reading Application TCP Proxy", err.Error())
-		return
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode == http.StatusNotFound {
+	if proxy == nil {
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	if httpResp.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("Error Reading Application TCP Proxy", parseHTTPError(httpResp).Error())
-		return
-	}
 
-	var proxy tcpProxyResponse
-	if err := json.NewDecoder(httpResp.Body).Decode(&proxy); err != nil {
-		resp.Diagnostics.AddError("Error Reading Application TCP Proxy", fmt.Sprintf("decoding response: %s", err))
-		return
-	}
-
-	flattenTCPProxy(&proxy, &state)
-
+	flattenTCPProxy(proxy, &state)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
+// find returns the TCP proxy with the given ID, or nil when there is none.
+// The API has no endpoint to get a single TCP proxy.
+func (r *applicationTCPProxyResource) find(ctx context.Context, appID, proxyID string) (*client.TCPProxy, error) {
+	proxies, err := r.client.ListTCPProxies(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range proxies {
+		if proxies[i].ID == proxyID {
+			return &proxies[i], nil
+		}
+	}
+	return nil, nil
+}
+
 func (r *applicationTCPProxyResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Application TCP proxies cannot be updated. Delete and recreate the resource instead.",
-	)
+	resp.Diagnostics.AddError("Update Not Supported", "TCP proxies cannot be updated. Change a required attribute to replace the resource.")
 }
 
 func (r *applicationTCPProxyResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -246,23 +221,9 @@ func (r *applicationTCPProxyResource) Delete(ctx context.Context, req resource.D
 		return
 	}
 
-	appID := state.ApplicationID.ValueString()
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, r.client.BaseURL+"/applications/"+appID+"/tcp-proxies/"+state.ID.ValueString(), nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Deleting Application TCP Proxy", err.Error())
-		return
-	}
-
-	httpResp, err := r.client.HTTPClient.Do(httpReq)
-	if err != nil {
-		resp.Diagnostics.AddError("Error Deleting Application TCP Proxy", err.Error())
-		return
-	}
-	defer httpResp.Body.Close()
-
-	if httpResp.StatusCode != http.StatusOK && httpResp.StatusCode != http.StatusNoContent {
-		resp.Diagnostics.AddError("Error Deleting Application TCP Proxy", parseHTTPError(httpResp).Error())
-		return
+	err := r.client.DeleteTCPProxy(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
+	if err != nil && !client.IsNotFound(err) {
+		resp.Diagnostics.AddError("Error Deleting TCP Proxy", err.Error())
 	}
 }
 
@@ -280,31 +241,13 @@ func (r *applicationTCPProxyResource) ImportState(ctx context.Context, req resou
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
 }
 
-func flattenTCPProxy(proxy *tcpProxyResponse, model *ApplicationTCPProxyResourceModel) {
-	model.ID = types.StringValue(proxy.ID)
-	if proxy.ProcessID != nil {
-		model.ProcessID = types.StringValue(*proxy.ProcessID)
-	}
-	model.Port = types.Int64Value(proxy.Port)
-	model.ExternalPort = types.Int64Value(proxy.ExternalPort)
-	if proxy.Hostname != nil {
-		model.Hostname = types.StringValue(*proxy.Hostname)
-	} else {
-		model.Hostname = types.StringNull()
-	}
-	if proxy.Status != nil {
-		model.Status = types.StringValue(*proxy.Status)
-	} else {
-		model.Status = types.StringNull()
-	}
-	if proxy.CreatedAt != nil {
-		model.CreatedAt = types.StringValue(*proxy.CreatedAt)
-	} else {
-		model.CreatedAt = types.StringNull()
-	}
-	if proxy.UpdatedAt != nil {
-		model.UpdatedAt = types.StringValue(*proxy.UpdatedAt)
-	} else {
-		model.UpdatedAt = types.StringNull()
-	}
+func flattenTCPProxy(p *client.TCPProxy, model *ApplicationTCPProxyResourceModel) {
+	model.ID = types.StringValue(p.ID)
+	model.ProcessID = types.StringValue(p.ProcessID)
+	model.Port = types.Int64Value(p.Port)
+	model.ExternalPort = types.Int64Value(p.ExternalPort)
+	model.Hostname = types.StringValue(p.Hostname)
+	model.Status = types.StringValue(p.Status)
+	model.CreatedAt = types.StringValue(p.CreatedAt)
+	model.UpdatedAt = types.StringValue(p.UpdatedAt)
 }

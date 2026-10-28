@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -63,23 +66,27 @@ func (r *staticSiteEnvVarResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"key": schema.StringAttribute{
-				Description: "The environment variable key.",
+				Description: "The environment variable key (1-255 characters). Must be unique within the static site.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(1, 255)},
 			},
 			"value": schema.StringAttribute{
-				Description: "The environment variable value.",
+				Description: "The environment variable value (at most 32768 characters).",
 				Required:    true,
 				Sensitive:   true,
+				Validators:  []validator.String{stringvalidator.LengthAtMost(32768)},
 			},
 			"is_production": schema.BoolAttribute{
-				Description: "Whether this variable is used in production deployments. Defaults to true.",
+				Description: "Whether this variable is used in production deployments. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"is_preview": schema.BoolAttribute{
-				Description: "Whether this variable is used in preview deployments. Defaults to true.",
+				Description: "Whether this variable is used in preview deployments. Defaults to `true`.",
 				Optional:    true,
 				Computed:    true,
+				Default:     booldefault.StaticBool(true),
 			},
 			"branch": schema.StringAttribute{
 				Description: "Git branch this variable is scoped to. When omitted, the variable applies to all branches.",
@@ -219,12 +226,8 @@ func (r *staticSiteEnvVarResource) Update(ctx context.Context, req resource.Upda
 		updateReq.IsPreview = &v
 	}
 	if !plan.Branch.Equal(state.Branch) {
-		if plan.Branch.IsNull() {
-			updateReq.Branch = nil
-		} else {
-			v := plan.Branch.ValueString()
-			updateReq.Branch = &v
-		}
+		// A null plan value is sent as JSON null to scope the variable to all branches.
+		updateReq.Branch = client.NullableOf(plan.Branch.ValueStringPointer())
 	}
 
 	envVar, err := r.client.UpdateEnvironmentVariable(ctx, "/static-sites", siteID, state.ID.ValueString(), updateReq)
@@ -246,7 +249,7 @@ func (r *staticSiteEnvVarResource) Delete(ctx context.Context, req resource.Dele
 	}
 
 	err := r.client.DeleteEnvironmentVariable(ctx, "/static-sites", state.StaticSiteID.ValueString(), state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Static Site Environment Variable", err.Error())
 		return
 	}
@@ -271,16 +274,9 @@ func flattenStaticSiteEnvVar(envVar *client.EnvironmentVariable, model *StaticSi
 	model.Key = types.StringValue(envVar.Key)
 	model.Value = types.StringValue(envVar.Value)
 
-	if envVar.IsProduction != nil {
-		model.IsProduction = types.BoolValue(*envVar.IsProduction)
-	} else {
-		model.IsProduction = types.BoolNull()
-	}
-	if envVar.IsPreview != nil {
-		model.IsPreview = types.BoolValue(*envVar.IsPreview)
-	} else {
-		model.IsPreview = types.BoolNull()
-	}
+	// A null flag means the API default, which is true.
+	model.IsProduction = types.BoolValue(envVar.IsProduction == nil || *envVar.IsProduction)
+	model.IsPreview = types.BoolValue(envVar.IsPreview == nil || *envVar.IsPreview)
 	if envVar.Branch != nil {
 		model.Branch = types.StringValue(*envVar.Branch)
 	} else {

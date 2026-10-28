@@ -3,7 +3,13 @@ package application
 import (
 	"context"
 	"fmt"
+	"reflect"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
+	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -13,6 +19,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
 )
@@ -49,6 +57,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 			"display_name": schema.StringAttribute{
 				Description: "The display name of the application (2-64 characters).",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.LengthBetween(2, 64)},
 			},
 			"cluster_id": schema.StringAttribute{
 				Description: "The cluster where the application is deployed. Cannot be changed after creation.",
@@ -58,17 +67,23 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"source": schema.StringAttribute{
-				Description: "The source type of the application. Valid values: privateGit, publicGit, dockerImage.",
+				Description: "The source type of the application. Valid values: `privateGit`, `publicGit`, `dockerImage`.",
 				Required:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("privateGit", "publicGit", "dockerImage")},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The project ID to associate with this application.",
-				Optional:    true,
-			},
-			"git_type": schema.StringAttribute{
-				Description: "The Git provider type. Valid values: github, bitbucket, gitlab.",
+				Description: "The ID of the project to group the application under. Changing it moves the application to the new project; removing it from the configuration leaves the application in its current project.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"git_type": schema.StringAttribute{
+				Description: "The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`.",
+				Optional:    true,
+				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("github", "bitbucket", "gitlab")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -78,9 +93,10 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Optional:    true,
 			},
 			"default_branch": schema.StringAttribute{
-				Description: "The default branch to deploy from.",
+				Description: "The default branch to deploy from. Defaults to the repository's default branch.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.LengthAtLeast(1)},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -102,10 +118,11 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"build_type": schema.StringAttribute{
-				Description: "The build type. Valid values: dockerfile, pack, nixpacks.",
+				Description: "The build type. Valid values: `dockerfile`, `pack` (Cloud Native Buildpacks), `nixpacks`, `railpack`. Defaults to `dockerfile`.",
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString("dockerfile"),
+				Validators:  []validator.String{stringvalidator.OneOf("dockerfile", "pack", "nixpacks", "railpack")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -144,49 +161,50 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"hibernate_after_seconds": schema.Int64Attribute{
-				Description: "Number of seconds of inactivity before the application hibernates.",
+				Description: "Number of seconds of inactivity before the application hibernates (1-604800).",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.Int64{int64validator.Between(1, 604800)},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 			"dockerfile_path": schema.StringAttribute{
-				Description: "The path to the Dockerfile.",
+				Description: "The path to the Dockerfile when `build_type` is `dockerfile`. Defaults to `Dockerfile`. Null for other build types.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("Dockerfile"),
 				PlanModifiers: []planmodifier.String{
-					nullUnlessBuildType("dockerfile"),
+					nullUnlessBuildType("dockerfile", "Dockerfile"),
 				},
 			},
 			"docker_context": schema.StringAttribute{
-				Description: "The Docker build context path.",
+				Description: "The Docker build context path when `build_type` is `dockerfile`. Defaults to `.`. Null for other build types.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("."),
 				PlanModifiers: []planmodifier.String{
-					nullUnlessBuildType("dockerfile"),
+					nullUnlessBuildType("dockerfile", "."),
 				},
 			},
 			"pack_builder": schema.StringAttribute{
-				Description: "The Cloud Native Buildpack builder to use.",
+				Description: "The Cloud Native Buildpacks builder image when `build_type` is `pack`. Valid values: `heroku/builder:22`, `heroku/builder:24`.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("heroku/builder:22", "heroku/builder:24")},
 				PlanModifiers: []planmodifier.String{
-					nullUnlessBuildType("pack"),
+					nullUnlessBuildType("pack", ""),
 				},
 			},
 			"nixpacks_version": schema.StringAttribute{
-				Description: "The Nixpacks version to use for builds.",
+				Description: "The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to the platform version.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.String{stringvalidator.OneOf("1.29", "1.39", "1.41")},
 				PlanModifiers: []planmodifier.String{
-					nullUnlessBuildType("nixpacks"),
+					nullUnlessBuildType("nixpacks", ""),
 				},
 			},
 			"allow_deploy_paths": schema.ListAttribute{
-				Description: "List of paths that trigger a deployment when changed.",
+				Description: "Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -195,7 +213,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"ignore_deploy_paths": schema.ListAttribute{
-				Description: "List of paths to ignore when determining whether to trigger a deployment.",
+				Description: "Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -204,29 +222,56 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"buildpacks": schema.ListNestedAttribute{
-				Description: "List of buildpack configurations for the application.",
+				Description: "Custom buildpacks when `build_type` is `pack`. Null for other build types.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.List{listvalidator.SizeAtLeast(1)},
 				PlanModifiers: []planmodifier.List{
-					listplanmodifier.UseStateForUnknown(),
+					nullUnlessBuildType("pack", ""),
 				},
 				NestedObject: schema.NestedAttributeObject{
+					// order and source are required, but Optional+Computed so that
+					// buildpacks set outside Terraform do not cause a perpetual diff.
+					Validators: []validator.Object{
+						objectvalidator.AlsoRequires(path.MatchRelative().AtName("order"), path.MatchRelative().AtName("source")),
+					},
 					Attributes: map[string]schema.Attribute{
 						"order": schema.Int64Attribute{
-							Description: "The order of the buildpack.",
-							Required:    true,
+							Description: "The position of the buildpack in the build (0-20). Required.",
+							Optional:    true,
+							Computed:    true,
+							Validators:  []validator.Int64{int64validator.Between(0, 20)},
 						},
 						"source": schema.StringAttribute{
-							Description: "The source of the buildpack.",
-							Required:    true,
+							Description: "The buildpack ID or URL. Required.",
+							Optional:    true,
+							Computed:    true,
+							Validators:  []validator.String{stringvalidator.LengthBetween(1, 500)},
 						},
 					},
 				},
 			},
-			"wait_for_checks": schema.BoolAttribute{
-				Description: "Whether to wait for checks before deploying.",
+			"cdn_enabled": schema.BoolAttribute{
+				Description: "Whether the CDN is enabled for the application.",
 				Optional:    true,
 				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"edge_cache_enabled": schema.BoolAttribute{
+				Description: "Whether edge caching is enabled for the application.",
+				Optional:    true,
+				Computed:    true,
+				PlanModifiers: []planmodifier.Bool{
+					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"wait_for_checks": schema.BoolAttribute{
+				Description:        "Has no effect.",
+				DeprecationMessage: "The Sevalla API does not support wait_for_checks and the provider never sent it. Remove it from your configuration; it will be removed in a future major version.",
+				Optional:           true,
+				Computed:           true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
 				},
@@ -314,9 +359,7 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		return
 	}
 
-	createReq := buildCreateRequest(&plan)
-
-	app, err := r.client.CreateApplication(ctx, createReq)
+	app, err := r.client.CreateApplication(ctx, buildCreateRequest(&plan))
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Creating Application",
@@ -324,14 +367,14 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		)
 		return
 	}
-
 	appID := app.ID
+	// Save the ID first so a failure below leaves a tainted resource instead of an orphan.
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), appID)...)
 
 	// The create endpoint only accepts a limited set of fields. Apply any
 	// additional plan values (e.g. auto_deploy, build_type) via an update.
 	if updateReq := buildPostCreateUpdateRequest(ctx, &plan); updateReq != nil {
-		_, err = r.client.UpdateApplication(ctx, appID, updateReq)
-		if err != nil {
+		if _, err := r.client.UpdateApplication(ctx, appID, updateReq); err != nil {
 			resp.Diagnostics.AddError(
 				"Error Updating Application After Create",
 				"Application was created but failed to apply additional settings: "+err.Error(),
@@ -340,21 +383,15 @@ func (r *applicationResource) Create(ctx context.Context, req resource.CreateReq
 		}
 	}
 
-	// Read-after-write to ensure the state reflects the complete application.
-	app, err = r.client.GetApplication(ctx, appID)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Reading Application",
-			"Could not read application ID "+appID+": "+err.Error(),
-		)
+	if err := r.applyToggles(ctx, appID, &plan, nil); err != nil {
+		resp.Diagnostics.AddError("Error Updating Application After Create", err.Error())
 		return
 	}
 
-	resp.Diagnostics.Append(flattenApplication(ctx, app, &plan)...)
+	r.readInto(ctx, appID, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
@@ -396,24 +433,97 @@ func (r *applicationResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
+	appID := state.ID.ValueString()
 
-	updateReq := buildUpdateRequest(ctx, &plan, &state)
+	if updateReq := buildUpdateRequest(ctx, &plan, &state); !reflect.ValueOf(*updateReq).IsZero() {
+		if _, err := r.client.UpdateApplication(ctx, appID, updateReq); err != nil {
+			resp.Diagnostics.AddError(
+				"Error Updating Application",
+				"Could not update application ID "+appID+": "+err.Error(),
+			)
+			return
+		}
+	}
 
-	app, err := r.client.UpdateApplication(ctx, state.ID.ValueString(), updateReq)
-	if err != nil {
-		resp.Diagnostics.AddError(
-			"Error Updating Application",
-			"Could not update application ID "+state.ID.ValueString()+": "+err.Error(),
-		)
+	if !plan.ProjectID.IsUnknown() && !plan.ProjectID.IsNull() && !plan.ProjectID.Equal(state.ProjectID) {
+		err := r.client.AddProjectService(ctx, plan.ProjectID.ValueString(), &client.AddProjectServiceRequest{
+			ServiceID:   appID,
+			ServiceType: "app",
+		})
+		if err != nil {
+			resp.Diagnostics.AddError("Error Updating Application", "Could not move application ID "+appID+" to project: "+err.Error())
+			return
+		}
+	}
+
+	if err := r.applyToggles(ctx, appID, &plan, &state); err != nil {
+		resp.Diagnostics.AddError("Error Updating Application", err.Error())
 		return
 	}
 
-	resp.Diagnostics.Append(flattenApplication(ctx, app, &plan)...)
+	// The PATCH response omits fields such as buildpacks, so read the full application.
+	r.readInto(ctx, appID, &plan, &resp.Diagnostics)
 	if resp.Diagnostics.HasError() {
 		return
 	}
-
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+}
+
+// applyToggles flips the CDN and edge cache settings when the plan changes
+// them (state is nil on create) and the application's current value differs.
+func (r *applicationResource) applyToggles(ctx context.Context, appID string, plan, state *ApplicationResourceModel) error {
+	type setting struct {
+		name   string
+		want   types.Bool
+		prior  types.Bool
+		get    func(*client.Application) *bool
+		toggle func(context.Context, string) (bool, error)
+	}
+	settings := []setting{
+		{"the CDN", plan.CDNEnabled, types.BoolNull(), func(a *client.Application) *bool { return a.IsCDNEnabled }, r.client.ToggleApplicationCDN},
+		{"edge caching", plan.EdgeCacheEnabled, types.BoolNull(), func(a *client.Application) *bool { return a.IsEdgeCacheEnabled }, r.client.ToggleApplicationEdgeCache},
+	}
+	if state != nil {
+		settings[0].prior = state.CDNEnabled
+		settings[1].prior = state.EdgeCacheEnabled
+	}
+
+	var app *client.Application
+	for _, s := range settings {
+		if s.want.IsUnknown() || s.want.IsNull() || s.want.Equal(s.prior) {
+			continue
+		}
+		if app == nil {
+			var err error
+			if app, err = r.client.GetApplication(ctx, appID); err != nil {
+				return fmt.Errorf("could not read application ID %s: %w", appID, err)
+			}
+		}
+		current := s.get(app)
+		if current == nil {
+			return fmt.Errorf("the status of %s of application ID %s is temporarily unavailable; try again later", s.name, appID)
+		}
+		if *current == s.want.ValueBool() {
+			continue
+		}
+		on, err := s.toggle(ctx, appID)
+		if err != nil {
+			return fmt.Errorf("could not toggle %s of application ID %s: %w", s.name, appID, err)
+		}
+		if on != s.want.ValueBool() {
+			return fmt.Errorf("toggling %s of application ID %s did not change it", s.name, appID)
+		}
+	}
+	return nil
+}
+
+func (r *applicationResource) readInto(ctx context.Context, appID string, model *ApplicationResourceModel, diags *diag.Diagnostics) {
+	app, err := r.client.GetApplication(ctx, appID)
+	if err != nil {
+		diags.AddError("Error Reading Application", "Could not read application ID "+appID+": "+err.Error())
+		return
+	}
+	diags.Append(flattenApplication(ctx, app, model)...)
 }
 
 func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -424,7 +534,7 @@ func (r *applicationResource) Delete(ctx context.Context, req resource.DeleteReq
 	}
 
 	err := r.client.DeleteApplication(ctx, state.ID.ValueString())
-	if err != nil {
+	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError(
 			"Error Deleting Application",
 			"Could not delete application ID "+state.ID.ValueString()+": "+err.Error(),
@@ -438,15 +548,18 @@ func (r *applicationResource) ImportState(ctx context.Context, req resource.Impo
 }
 
 // nullUnlessBuildTypeModifier is a plan modifier that sets a string attribute
-// to null when build_type does not match the required type. This mirrors the
-// API behaviour where build-type-specific fields (e.g. nixpacks_version,
-// dockerfile_path) are cleared when switching to a different build type.
+// to null when build_type does not match the required type, because
+// build-type-specific fields (e.g. nixpacks_version, dockerfile_path) have no
+// effect for other build types and are stored as null in state. It also
+// applies defaultValue when the build type is first set, which a schema
+// Default cannot do without planning an update for every other build type.
 type nullUnlessBuildTypeModifier struct {
 	requiredBuildType string
+	defaultValue      string
 }
 
-func nullUnlessBuildType(bt string) planmodifier.String {
-	return nullUnlessBuildTypeModifier{requiredBuildType: bt}
+func nullUnlessBuildType(bt, defaultValue string) nullUnlessBuildTypeModifier {
+	return nullUnlessBuildTypeModifier{requiredBuildType: bt, defaultValue: defaultValue}
 }
 
 func (m nullUnlessBuildTypeModifier) Description(_ context.Context) string {
@@ -457,28 +570,67 @@ func (m nullUnlessBuildTypeModifier) MarkdownDescription(ctx context.Context) st
 	return m.Description(ctx)
 }
 
-func (m nullUnlessBuildTypeModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+// planAction decides what an unconfigured or irrelevant value is planned as.
+type planAction int
+
+const (
+	planKeep    planAction = iota // keep the planned value
+	planNull                      // the build type does not use the attribute
+	planUnknown                   // the API decides the value
+	planState                     // carry the value forward from state
+	planDefault                   // use defaultValue
+)
+
+func (m nullUnlessBuildTypeModifier) action(ctx context.Context, plan tfsdk.Plan, state tfsdk.State, configNull bool, diags *diag.Diagnostics) planAction {
 	var buildType types.String
-	diags := req.Plan.GetAttribute(ctx, path.Root("build_type"), &buildType)
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
+	diags.Append(plan.GetAttribute(ctx, path.Root("build_type"), &buildType)...)
+	switch {
+	case diags.HasError():
+		return planKeep
+	case buildType.IsUnknown():
+		return planUnknown
+	case buildType.ValueString() != m.requiredBuildType:
+		return planNull
+	case !configNull:
+		return planKeep
 	}
 
-	// If build_type is unknown, mark this field unknown too.
-	if buildType.IsUnknown() {
-		resp.PlanValue = types.StringUnknown()
-		return
+	// The build type matches but the value is not configured. Keep it if the
+	// build type is unchanged; otherwise use the default, or let the API decide.
+	var stateBuildType types.String
+	if !state.Raw.IsNull() {
+		diags.Append(state.GetAttribute(ctx, path.Root("build_type"), &stateBuildType)...)
 	}
+	switch {
+	case stateBuildType.ValueString() == m.requiredBuildType:
+		return planState
+	case m.defaultValue != "":
+		return planDefault
+	default:
+		return planUnknown
+	}
+}
 
-	// If build_type doesn't match, the API will null this field out.
-	if buildType.ValueString() != m.requiredBuildType {
+func (m nullUnlessBuildTypeModifier) PlanModifyString(ctx context.Context, req planmodifier.StringRequest, resp *planmodifier.StringResponse) {
+	switch m.action(ctx, req.Plan, req.State, req.ConfigValue.IsNull(), &resp.Diagnostics) {
+	case planNull:
 		resp.PlanValue = types.StringNull()
-		return
+	case planUnknown:
+		resp.PlanValue = types.StringUnknown()
+	case planState:
+		resp.PlanValue = req.StateValue
+	case planDefault:
+		resp.PlanValue = types.StringValue(m.defaultValue)
 	}
+}
 
-	// Build type matches — carry state forward for computed values.
-	if resp.PlanValue.IsUnknown() {
+func (m nullUnlessBuildTypeModifier) PlanModifyList(ctx context.Context, req planmodifier.ListRequest, resp *planmodifier.ListResponse) {
+	switch m.action(ctx, req.Plan, req.State, req.ConfigValue.IsNull(), &resp.Diagnostics) {
+	case planNull:
+		resp.PlanValue = types.ListNull(req.PlanValue.ElementType(ctx))
+	case planUnknown:
+		resp.PlanValue = types.ListUnknown(req.PlanValue.ElementType(ctx))
+	case planState:
 		resp.PlanValue = req.StateValue
 	}
 }

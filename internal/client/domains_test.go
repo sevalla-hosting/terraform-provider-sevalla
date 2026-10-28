@@ -7,54 +7,6 @@ import (
 	"testing"
 )
 
-func TestListDomains_Success(t *testing.T) {
-	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/applications/app-123/domains" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		if r.Method != http.MethodGet {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]Domain{
-			{
-				ID:        "dom-1",
-				Name:      "example.com",
-				Type:      "custom",
-				IsPrimary: true,
-				IsEnabled: true,
-				CreatedAt: "2025-01-01T00:00:00.000Z",
-				UpdatedAt: "2025-01-01T00:00:00.000Z",
-			},
-			{
-				ID:        "dom-2",
-				Name:      "www.example.com",
-				Type:      "custom",
-				IsPrimary: false,
-				IsEnabled:   true,
-				CreatedAt: "2025-01-01T00:00:00.000Z",
-				UpdatedAt: "2025-01-01T00:00:00.000Z",
-			},
-		})
-	})
-	defer server.Close()
-
-	domains, err := c.ListDomains(context.Background(), "/applications", "app-123")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(domains) != 2 {
-		t.Fatalf("expected 2 domains, got %d", len(domains))
-	}
-	if domains[0].Name != "example.com" {
-		t.Errorf("expected name %q, got %q", "example.com", domains[0].Name)
-	}
-	if !domains[0].IsPrimary {
-		t.Error("expected first domain to be primary")
-	}
-}
-
 func TestGetDomain_Success(t *testing.T) {
 	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/applications/app-123/domains/dom-456" {
@@ -70,7 +22,7 @@ func TestGetDomain_Success(t *testing.T) {
 			Name:      "example.com",
 			Type:      "custom",
 			IsPrimary: true,
-			IsEnabled:   true,
+			IsEnabled: true,
 			CreatedAt: "2025-01-01T00:00:00.000Z",
 			UpdatedAt: "2025-01-01T00:00:00.000Z",
 		})
@@ -132,7 +84,7 @@ func TestCreateDomain_Success(t *testing.T) {
 			Name:      req.DomainName,
 			Type:      "custom",
 			IsPrimary: false,
-			IsEnabled:   true,
+			IsEnabled: true,
 			CreatedAt: "2025-01-01T00:00:00.000Z",
 			UpdatedAt: "2025-01-01T00:00:00.000Z",
 		})
@@ -166,24 +118,6 @@ func TestDeleteDomain_Success(t *testing.T) {
 	defer server.Close()
 
 	err := c.DeleteDomain(context.Background(), "/applications", "app-123", "dom-456")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestSetPrimaryDomain_Success(t *testing.T) {
-	c, server := testClient(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("unexpected method: %s", r.Method)
-		}
-		if r.URL.Path != "/applications/app-123/domains/dom-456/set-primary" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		w.WriteHeader(http.StatusOK)
-	})
-	defer server.Close()
-
-	err := c.SetPrimaryDomain(context.Background(), "/applications", "app-123", "dom-456")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

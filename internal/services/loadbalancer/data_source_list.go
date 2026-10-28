@@ -52,6 +52,14 @@ func (d *loadBalancerListDataSource) Schema(_ context.Context, _ datasource.Sche
 							Description: "The routing type.",
 							Computed:    true,
 						},
+						"project_id": schema.StringAttribute{
+							Description: "The ID of the project the load balancer is grouped under.",
+							Computed:    true,
+						},
+						"company_id": schema.StringAttribute{
+							Description: "The company ID that owns the load balancer.",
+							Computed:    true,
+						},
 						"created_at": schema.StringAttribute{
 							Description: "When the load balancer was created.",
 							Computed:    true,
@@ -102,7 +110,9 @@ func (d *loadBalancerListDataSource) Read(ctx context.Context, _ datasource.Read
 			ID:          types.StringValue(lb.ID),
 			Name:        types.StringValue(lb.Name),
 			DisplayName: types.StringValue(lb.DisplayName),
-			Type:        optionalString(lb.Type),
+			Type:        types.StringValue(lb.Type),
+			ProjectID:   optionalString(lb.ProjectID),
+			CompanyID:   optionalString(lb.CompanyID),
 			CreatedAt:   types.StringValue(lb.CreatedAt),
 			UpdatedAt:   types.StringValue(lb.UpdatedAt),
 		}

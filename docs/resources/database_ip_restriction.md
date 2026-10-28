@@ -13,15 +13,12 @@ Manages IP restrictions for a Sevalla database.
 ## Example Usage
 
 ```terraform
+# Only allow external connections from an office network
 resource "sevalla_database_ip_restriction" "example" {
   database_id = sevalla_database.postgres.id
   type        = "allow"
-  enabled     = true
-
-  rules {
-    address     = "203.0.113.0/24"
-    description = "Office network"
-  }
+  is_enabled  = true
+  ip_list     = ["203.0.113.0/24"]
 }
 ```
 
@@ -31,17 +28,6 @@ resource "sevalla_database_ip_restriction" "example" {
 ### Required
 
 - `database_id` (String) The ID of the database. Acts as the resource identifier.
-- `enabled` (Boolean) Whether IP restriction is enabled.
-- `rules` (Attributes List) List of IP restriction rules. (see [below for nested schema](#nestedatt--rules))
-- `type` (String) The restriction type. Valid values: allow, deny.
-
-<a id="nestedatt--rules"></a>
-### Nested Schema for `rules`
-
-Required:
-
-- `address` (String) The IP address or CIDR range.
-
-Optional:
-
-- `description` (String) A description for the rule.
+- `ip_list` (List of String) Public IP addresses or CIDR ranges the restriction applies to (at most 500).
+- `is_enabled` (Boolean) Whether IP restriction is enabled.
+- `type` (String) The restriction type: `allow` lets only the listed IPs connect externally, `deny` blocks them.

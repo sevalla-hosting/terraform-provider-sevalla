@@ -31,6 +31,7 @@ output "site_hostname" {
 
 ### Read-Only
 
+- `allow_deploy_paths` (List of String) Paths that trigger a deployment when changed.
 - `auto_deploy` (Boolean) Whether auto deploy is enabled.
 - `build_command` (String) The build command.
 - `company_id` (String) The company ID that owns the static site.
@@ -38,8 +39,10 @@ output "site_hostname" {
 - `default_branch` (String) The default branch to deploy from.
 - `display_name` (String) The display name of the static site.
 - `error_file` (String) The error file for the static site.
+- `git_lfs_enabled` (Boolean) Whether Git LFS objects are fetched during the source checkout step.
 - `git_type` (String) The Git provider type.
 - `hostname` (String) The hostname of the static site.
+- `ignore_deploy_paths` (List of String) Paths to ignore for deployment triggers.
 - `index_file` (String) The index file for the static site.
 - `install_command` (String) The install command.
 - `is_preview_enabled` (Boolean) Whether preview deployments are enabled.
