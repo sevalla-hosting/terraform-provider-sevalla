@@ -109,7 +109,7 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:    true,
 			},
 			"extensions": schema.SingleNestedAttribute{
-				Description: "PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing them creates a new database, except after an import, when the configured value is only recorded.",
+				Description: "PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing them creates a new database. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the database does not already use them.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.Object{
 					writeonly.RequiresReplaceObject(),
@@ -339,6 +339,10 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 			resp.Diagnostics.AddError("Error Waiting for Database Password Reset", "Database "+dbID+" did not become ready: "+err.Error())
 			return
 		}
+	}
+
+	if !plan.Extensions.IsNull() && state.Extensions.IsNull() {
+		writeonly.WarnRecorded(&resp.Diagnostics, path.Root("extensions"), "database")
 	}
 
 	db, err := r.client.GetDatabase(ctx, dbID)

@@ -88,7 +88,7 @@ func (r *loadBalancerDomainResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"custom_ssl_cert": schema.StringAttribute{
-				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain, except after an import, when the configured value is only recorded.",
+				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_key"))},
@@ -97,7 +97,7 @@ func (r *loadBalancerDomainResource) Schema(_ context.Context, _ resource.Schema
 				},
 			},
 			"custom_ssl_key": schema.StringAttribute{
-				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain, except after an import, when the configured value is only recorded.",
+				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_cert"))},
@@ -216,13 +216,17 @@ func (r *loadBalancerDomainResource) Read(ctx context.Context, req resource.Read
 }
 
 // Update is only reached when custom_ssl_cert or custom_ssl_key is first set
-// after an import. The API never returns them, so they are only recorded.
+// after an import. The API never returns them, so they are only recorded, with
+// a warning.
 func (r *loadBalancerDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state LoadBalancerDomainResourceModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+	if !plan.CustomSSLCert.IsNull() && state.CustomSSLCert.IsNull() {
+		writeonly.WarnRecorded(&resp.Diagnostics, path.Root("custom_ssl_cert"), "domain")
 	}
 	state.CustomSSLCert = plan.CustomSSLCert
 	state.CustomSSLKey = plan.CustomSSLKey

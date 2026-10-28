@@ -39,8 +39,8 @@ resource "sevalla_load_balancer_domain" "wildcard" {
 
 ### Optional
 
-- `custom_ssl_cert` (String, Sensitive) Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain, except after an import, when the configured value is only recorded.
-- `custom_ssl_key` (String, Sensitive) Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain, except after an import, when the configured value is only recorded.
+- `custom_ssl_cert` (String, Sensitive) Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.
+- `custom_ssl_key` (String, Sensitive) Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain. After an import, the configured value is only recorded, with a warning: the API never returns it, so use `terraform apply -replace` if the domain does not already use it.
 - `is_wildcard` (Boolean) Whether the domain is a wildcard domain that matches all subdomains. Defaults to `false`. Changing this creates a new domain.
 
 ### Read-Only

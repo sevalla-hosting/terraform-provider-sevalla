@@ -5,8 +5,10 @@ package writeonly
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -55,4 +57,14 @@ func RequiresReplaceObject() planmodifier.Object {
 		resp.Diagnostics.Append(diags...)
 		resp.RequiresReplace = replace
 	}, description, description)
+}
+
+// WarnRecorded warns that a configured value was saved in state without being
+// sent to the API. The provider cannot tell whether an imported resource
+// already uses the value, so this is the only signal the user gets.
+func WarnRecorded(diags *diag.Diagnostics, attr path.Path, kind string) {
+	diags.AddAttributeWarning(attr, "Value Recorded but Not Applied", fmt.Sprintf(
+		"%s was saved in the Terraform state but not sent to Sevalla. The API never returns it, so after an import "+
+			"the provider cannot tell whether the %s already uses this value. If it does not, recreate the %s with "+
+			"terraform apply -replace=<resource address>.", attr, kind, kind))
 }

@@ -124,6 +124,40 @@ func TestApplicationDomain_FakeAPIImportRecordsCertificate(t *testing.T) {
 	})
 }
 
+// The API never reports a domain's certificate, so a certificate added after an
+// import can only be recorded (with a warning) instead of replacing the domain.
+func TestApplicationDomain_FakeAPICertificateAddedAfterImportIsRecorded(t *testing.T) {
+	testutil.FakeAPI(t, fakeDomainAPI(t, map[string]map[string]any{
+		"dom-9": {
+			"id": "dom-9", "name": "shop.example.com", "status": "ACTIVE", "type": "CUSTOM",
+			"is_enabled": true, "is_wildcard": false, "is_primary": true, "dns_records": nil, "errors": nil,
+			"created_at": "2025-01-01T00:00:00.000Z", "updated_at": "2025-01-01T00:00:00.000Z",
+		},
+	}))
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: testutil.TestAccProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:             domainConfig(false),
+				ResourceName:       "sevalla_application_domain.test",
+				ImportState:        true,
+				ImportStateId:      "app-1/dom-9",
+				ImportStatePersist: true,
+			},
+			{Config: domainConfig(false)},
+			{
+				Config: domainConfig(true),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("sevalla_application_domain.test", plancheck.ResourceActionUpdate),
+					},
+				},
+			},
+		},
+	})
+}
+
 // fakeTCPProxyAPI has no endpoint to get a single proxy, like the real API,
 // and reports a new proxy as creating until it is listed once.
 func fakeTCPProxyAPI(t *testing.T) http.HandlerFunc {
