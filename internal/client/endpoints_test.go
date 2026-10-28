@@ -30,7 +30,12 @@ func TestUsedEndpoints(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		for _, m := range call.FindAllStringSubmatch(string(src), -1) {
+		matches := call.FindAllStringSubmatch(string(src), -1)
+		// pagination.go is the generic paginator; its callers pass the path.
+		if calls := strings.Count(string(src), "c.do(ctx, ") + strings.Count(string(src), "Paginate["); f != "pagination.go" && calls != len(matches) {
+			t.Errorf("%s: %d API calls, but only %d have a path this test can read; use a string literal or path()", f, calls, len(matches))
+		}
+		for _, m := range matches {
 			method := m[1]
 			if method == "" {
 				method = "GET"

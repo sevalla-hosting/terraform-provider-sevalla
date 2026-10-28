@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -23,11 +24,12 @@ import (
 // deploymentTimeout bounds how long wait_for_completion waits.
 const deploymentTimeout = 60 * time.Minute
 
-var commitSHAPattern = regexp.MustCompile(`^[0-9a-fA-F]{40}$`)
+var commitSHAPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 var (
-	_ resource.Resource              = &applicationDeploymentResource{}
-	_ resource.ResourceWithConfigure = &applicationDeploymentResource{}
+	_ resource.Resource                   = &applicationDeploymentResource{}
+	_ resource.ResourceWithConfigure      = &applicationDeploymentResource{}
+	_ resource.ResourceWithValidateConfig = &applicationDeploymentResource{}
 )
 
 type applicationDeploymentResource struct {
@@ -87,11 +89,11 @@ func (r *applicationDeploymentResource) Schema(_ context.Context, _ resource.Sch
 				PlanModifiers: requiresReplaceString,
 			},
 			"commit_sha": schema.StringAttribute{
-				Description:   "The full 40-character SHA of the commit to deploy. Defaults to the latest commit on the branch.",
+				Description:   "The full 40-character SHA of the commit to deploy. Defaults to the latest commit on the branch. Requires `is_restart = false`.",
 				Optional:      true,
 				PlanModifiers: requiresReplaceString,
 				Validators: []validator.String{
-					stringvalidator.RegexMatches(commitSHAPattern, "must be a full 40-character commit SHA"),
+					stringvalidator.RegexMatches(commitSHAPattern, "must be a full 40-character lowercase commit SHA"),
 				},
 			},
 			"docker_image": schema.StringAttribute{
@@ -100,7 +102,7 @@ func (r *applicationDeploymentResource) Schema(_ context.Context, _ resource.Sch
 				PlanModifiers: requiresReplaceString,
 			},
 			"skip_build_cache": schema.BoolAttribute{
-				Description: "When true, every layer is rebuilt instead of being reused from the build cache. Defaults to `false`.",
+				Description: "When true, every layer is rebuilt instead of being reused from the build cache. Defaults to `false`. Requires `is_restart = false`.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.RequiresReplace(),
@@ -123,6 +125,22 @@ func (r *applicationDeploymentResource) Schema(_ context.Context, _ resource.Sch
 				Computed:    true,
 			},
 		},
+	}
+}
+
+// ValidateConfig rejects options the API cannot combine with a restart,
+// which is_restart defaults to.
+func (r *applicationDeploymentResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var config ApplicationDeploymentResourceModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &config)...)
+	if resp.Diagnostics.HasError() || config.IsRestart.IsUnknown() || (!config.IsRestart.IsNull() && !config.IsRestart.ValueBool()) {
+		return
+	}
+	if !config.CommitSHA.IsNull() && !config.CommitSHA.IsUnknown() {
+		resp.Diagnostics.AddAttributeError(path.Root("commit_sha"), "Invalid Attribute Combination", "commit_sha builds a specific commit, so it requires is_restart = false.")
+	}
+	if config.SkipBuildCache.ValueBool() {
+		resp.Diagnostics.AddAttributeError(path.Root("skip_build_cache"), "Invalid Attribute Combination", "skip_build_cache rebuilds the application, so it requires is_restart = false.")
 	}
 }
 
@@ -175,8 +193,13 @@ func (r *applicationDeploymentResource) Create(ctx context.Context, req resource
 
 	err = client.Poll(ctx, deploymentTimeout, func() (bool, error) {
 		d, err := r.client.GetDeployment(ctx, appID, deployment.ID)
-		if err != nil {
+		var apiErr *client.APIError
+		if err != nil && errors.As(err, &apiErr) && apiErr.StatusCode < 500 {
 			return false, err
+		}
+		if err != nil {
+			// Keep waiting through network errors and server errors.
+			return false, nil
 		}
 		plan.Status = optionalString(d.Status)
 		switch plan.Status.ValueString() {

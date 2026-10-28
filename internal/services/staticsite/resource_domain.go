@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/writeonly"
 )
 
 var (
@@ -98,21 +99,21 @@ func (r *staticSiteDomainResource) Schema(_ context.Context, _ resource.SchemaRe
 				},
 			},
 			"custom_ssl_cert": schema.StringAttribute{
-				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing this creates a new domain.",
+				Description: "Custom SSL certificate in PEM format, used instead of an auto-provisioned one. The API does not return it, so it is not checked for drift. Changing it creates a new domain, except after an import, when the configured value is only recorded.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_key"))},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					writeonly.RequiresReplace(),
 				},
 			},
 			"custom_ssl_key": schema.StringAttribute{
-				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing this creates a new domain.",
+				Description: "Private key of the custom SSL certificate in PEM format. Required with `custom_ssl_cert`. Changing it creates a new domain, except after an import, when the configured value is only recorded.",
 				Optional:    true,
 				Sensitive:   true,
 				Validators:  []validator.String{stringvalidator.AlsoRequires(path.MatchRoot("custom_ssl_cert"))},
 				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.RequiresReplace(),
+					writeonly.RequiresReplace(),
 				},
 			},
 			"is_enabled": schema.BoolAttribute{
@@ -214,11 +215,18 @@ func (r *staticSiteDomainResource) Read(ctx context.Context, req resource.ReadRe
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *staticSiteDomainResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	resp.Diagnostics.AddError(
-		"Update Not Supported",
-		"Static site domains cannot be updated. Delete and recreate the domain instead.",
-	)
+// Update is only reached when custom_ssl_cert or custom_ssl_key is first set
+// after an import. The API never returns them, so they are only recorded.
+func (r *staticSiteDomainResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
+	var plan, state StaticSiteDomainResourceModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+	state.CustomSSLCert = plan.CustomSSLCert
+	state.CustomSSLKey = plan.CustomSSLKey
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *staticSiteDomainResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -247,6 +255,7 @@ func (r *staticSiteDomainResource) ImportState(ctx context.Context, req resource
 
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("static_site_id"), parts[0])...)
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("id"), parts[1])...)
+	resp.Diagnostics.Append(writeonly.MarkImported(ctx, resp.Private)...)
 }
 
 func flattenStaticSiteDomain(domain *client.Domain, model *StaticSiteDomainResourceModel) {

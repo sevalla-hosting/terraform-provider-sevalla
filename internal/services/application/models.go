@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // ApplicationResourceModel is the Terraform state model for the sevalla_application resource.
@@ -277,10 +278,10 @@ func buildUpdateRequest(ctx context.Context, plan *ApplicationResourceModel, sta
 		req.DockerImage = &v
 	}
 	if !plan.AllowDeployPaths.IsUnknown() && !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
-		req.AllowDeployPaths = stringList(ctx, plan.AllowDeployPaths)
+		req.AllowDeployPaths = listutil.Strings(ctx, plan.AllowDeployPaths)
 	}
 	if !plan.IgnoreDeployPaths.IsUnknown() && !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
-		req.IgnoreDeployPaths = stringList(ctx, plan.IgnoreDeployPaths)
+		req.IgnoreDeployPaths = listutil.Strings(ctx, plan.IgnoreDeployPaths)
 	}
 	if !plan.Buildpacks.IsNull() && !plan.Buildpacks.IsUnknown() && !plan.Buildpacks.Equal(state.Buildpacks) {
 		var bpObjects []types.Object
@@ -404,33 +405,6 @@ func forBuildType(app *client.Application, buildType string, v *string) types.St
 		return types.StringNull()
 	}
 	return optionalString(v)
-}
-
-// stringList returns the list's elements as a non-nil slice, so an empty list
-// is sent to the API as [] rather than omitted.
-func stringList(ctx context.Context, list types.List) []string {
-	out := []string{}
-	list.ElementsAs(ctx, &out, false)
-	return out
-}
-
-// keepOrder returns prior when it holds the same elements as got, so a
-// server-side reordering does not show up as a diff.
-func keepOrder[T comparable](prior, got []T) []T {
-	if len(prior) != len(got) {
-		return got
-	}
-	counts := make(map[T]int, len(got))
-	for _, v := range got {
-		counts[v]++
-	}
-	for _, v := range prior {
-		if counts[v] == 0 {
-			return got
-		}
-		counts[v]--
-	}
-	return prior
 }
 
 func optionalBool(b *bool) types.Bool {

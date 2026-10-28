@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // StaticSiteResourceModel is the Terraform state model for the sevalla_static_site resource.
@@ -182,13 +183,13 @@ func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, stat
 		req.DefaultBranch = &v
 	}
 	if !plan.BuildCommand.IsNull() && !plan.BuildCommand.IsUnknown() && !plan.BuildCommand.Equal(state.BuildCommand) {
-		req.BuildCommand = client.NullableOf(plan.BuildCommand.ValueStringPointer())
+		req.BuildCommand = plan.BuildCommand.ValueStringPointer()
 	}
 	if !plan.NodeVersion.IsNull() && !plan.NodeVersion.IsUnknown() && !plan.NodeVersion.Equal(state.NodeVersion) {
-		req.NodeVersion = client.NullableOf(plan.NodeVersion.ValueStringPointer())
+		req.NodeVersion = plan.NodeVersion.ValueStringPointer()
 	}
 	if !plan.PublishedDirectory.IsNull() && !plan.PublishedDirectory.IsUnknown() && !plan.PublishedDirectory.Equal(state.PublishedDirectory) {
-		req.PublishedDirectory = client.NullableOf(plan.PublishedDirectory.ValueStringPointer())
+		req.PublishedDirectory = plan.PublishedDirectory.ValueStringPointer()
 	}
 	if !plan.IsPreviewEnabled.IsNull() && !plan.IsPreviewEnabled.IsUnknown() && !plan.IsPreviewEnabled.Equal(state.IsPreviewEnabled) {
 		v := plan.IsPreviewEnabled.ValueBool()
@@ -203,41 +204,33 @@ func buildUpdateRequest(ctx context.Context, plan *StaticSiteResourceModel, stat
 		req.Source = &v
 	}
 	if !plan.GitType.IsNull() && !plan.GitType.IsUnknown() && !plan.GitType.Equal(state.GitType) {
-		req.GitType = client.NullableOf(plan.GitType.ValueStringPointer())
+		req.GitType = plan.GitType.ValueStringPointer()
 	}
 	if !plan.RepoURL.IsNull() && !plan.RepoURL.IsUnknown() && !plan.RepoURL.Equal(state.RepoURL) {
 		v := plan.RepoURL.ValueString()
 		req.RepoURL = &v
 	}
 	if !plan.InstallCommand.IsNull() && !plan.InstallCommand.IsUnknown() && !plan.InstallCommand.Equal(state.InstallCommand) {
-		req.InstallCommand = client.NullableOf(plan.InstallCommand.ValueStringPointer())
+		req.InstallCommand = plan.InstallCommand.ValueStringPointer()
 	}
 	if !plan.RootDirectory.IsNull() && !plan.RootDirectory.IsUnknown() && !plan.RootDirectory.Equal(state.RootDirectory) {
-		req.RootDirectory = client.NullableOf(plan.RootDirectory.ValueStringPointer())
+		req.RootDirectory = plan.RootDirectory.ValueStringPointer()
 	}
 	if !plan.IndexFile.IsNull() && !plan.IndexFile.IsUnknown() && !plan.IndexFile.Equal(state.IndexFile) {
 		v := plan.IndexFile.ValueString()
 		req.IndexFile = &v
 	}
 	if !plan.ErrorFile.IsNull() && !plan.ErrorFile.IsUnknown() && !plan.ErrorFile.Equal(state.ErrorFile) {
-		req.ErrorFile = client.NullableOf(plan.ErrorFile.ValueStringPointer())
+		req.ErrorFile = plan.ErrorFile.ValueStringPointer()
 	}
 	if !plan.AllowDeployPaths.IsUnknown() && !plan.AllowDeployPaths.Equal(state.AllowDeployPaths) {
-		req.AllowDeployPaths = stringList(ctx, plan.AllowDeployPaths)
+		req.AllowDeployPaths = listutil.Strings(ctx, plan.AllowDeployPaths)
 	}
 	if !plan.IgnoreDeployPaths.IsUnknown() && !plan.IgnoreDeployPaths.Equal(state.IgnoreDeployPaths) {
-		req.IgnoreDeployPaths = stringList(ctx, plan.IgnoreDeployPaths)
+		req.IgnoreDeployPaths = listutil.Strings(ctx, plan.IgnoreDeployPaths)
 	}
 
 	return req
-}
-
-// stringList returns the list's elements as a non-nil slice, so an empty list
-// is sent to the API as [] rather than omitted.
-func stringList(ctx context.Context, list types.List) []string {
-	out := []string{}
-	list.ElementsAs(ctx, &out, false)
-	return out
 }
 
 // optionalString converts a *string to a types.String, returning null for nil pointers.

@@ -58,7 +58,7 @@ resource "sevalla_database" "redis" {
 ### Optional
 
 - `db_user` (String) The database user (2-32 characters, not `root` or `postgres`). Defaults to the engine's default user. Redis and Valkey ignore it. Changing this creates a new database, except for Redis and Valkey.
-- `extensions` (Attributes) PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing or removing them creates a new database; setting them where none were recorded (e.g. after an import) only records them. (see [below for nested schema](#nestedatt--extensions))
+- `extensions` (Attributes) PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing them creates a new database, except after an import, when the configured value is only recorded. (see [below for nested schema](#nestedatt--extensions))
 - `project_id` (String) The ID of the project to group the database under. Removing it removes the database from the project.
 
 ### Read-Only

@@ -10,12 +10,12 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/writeonly"
 )
 
 const databaseReadyTimeout = 15 * time.Minute
@@ -109,14 +109,10 @@ func (r *databaseResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Optional:    true,
 			},
 			"extensions": schema.SingleNestedAttribute{
-				Description: "PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing or removing them creates a new database; setting them where none were recorded (e.g. after an import) only records them.",
+				Description: "PostgreSQL extensions to enable (PostgreSQL only). They can only be set when the database is created and the API does not return them, so they are not checked for drift. Changing them creates a new database, except after an import, when the configured value is only recorded.",
 				Optional:    true,
 				PlanModifiers: []planmodifier.Object{
-					objectplanmodifier.RequiresReplaceIf(func(_ context.Context, req planmodifier.ObjectRequest, resp *objectplanmodifier.RequiresReplaceIfFuncResponse) {
-						// The API does not return extensions, so a null state (e.g. after an
-						// import) is not a known value to compare against.
-						resp.RequiresReplace = !req.StateValue.IsNull()
-					}, "Changing extensions creates a new database.", "Changing `extensions` creates a new database."),
+					writeonly.RequiresReplaceObject(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"enable_vector": schema.BoolAttribute{
@@ -308,8 +304,9 @@ func (r *databaseResource) Update(ctx context.Context, req resource.UpdateReques
 	resetPassword := !state.DbPassword.IsNull() && !plan.DbPassword.Equal(state.DbPassword)
 
 	if resetPassword || !reflect.ValueOf(*updateReq).IsZero() {
-		// The database must be ready before it can be changed.
-		if _, err := r.client.WaitForDatabaseStatus(ctx, dbID, []string{"ready"}, databaseReadyTimeout); err != nil {
+		// Wait for any operation in progress to finish. A failed one (e.g. a
+		// password reset) must not block the change that retries it.
+		if _, err := r.client.WaitForDatabaseStatus(ctx, dbID, idleStatuses, databaseReadyTimeout); err != nil {
 			resp.Diagnostics.AddError(
 				"Error Waiting for Database Ready Before Update",
 				"Database "+dbID+" did not become ready: "+err.Error(),
@@ -371,7 +368,7 @@ func (r *databaseResource) Delete(ctx context.Context, req resource.DeleteReques
 	dbID := state.ID.ValueString()
 
 	// Wait for any operation in progress to finish before deleting.
-	_, err := r.client.WaitForDatabaseStatus(ctx, dbID, deletableStatuses, databaseReadyTimeout)
+	_, err := r.client.WaitForDatabaseStatus(ctx, dbID, idleStatuses, databaseReadyTimeout)
 	if err != nil {
 		if client.IsNotFound(err) {
 			return
@@ -424,9 +421,10 @@ func isKeyValueStore(dbType string) bool {
 	return dbType == "redis" || dbType == "valkey"
 }
 
-// deletableStatuses are the statuses in which no operation is in progress.
-var deletableStatuses = []string{"ready", "error", "passwordChangeFailed", "dbDeletionFailed", "restoringFailed"}
+// idleStatuses are the statuses in which no operation is in progress.
+var idleStatuses = []string{"ready", "error", "passwordChangeFailed", "dbDeletionFailed", "restoringFailed"}
 
 func (r *databaseResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("id"), req, resp)
+	resp.Diagnostics.Append(writeonly.MarkImported(ctx, resp.Private)...)
 }

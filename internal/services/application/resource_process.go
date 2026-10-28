@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/objectvalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -15,6 +17,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -343,13 +346,27 @@ func probeSchemaAttributes() map[string]schema.Attribute {
 				},
 			},
 		},
+		// Every nested field is Optional+Computed (with validators for the
+		// required ones): otherwise Terraform proposes removing a probe set
+		// outside Terraform on every plan.
 		"http_get": schema.SingleNestedAttribute{
 			Description: "HTTP GET probe.",
 			Optional:    true,
+			Computed:    true,
+			Validators: []validator.Object{
+				objectvalidator.AlsoRequires(path.MatchRelative().AtName("path")),
+			},
+			PlanModifiers: []planmodifier.Object{
+				objectplanmodifier.UseStateForUnknown(),
+			},
 			Attributes: map[string]schema.Attribute{
 				"path": schema.StringAttribute{
-					Description: "Path to probe. A probe without a path is not saved.",
-					Required:    true,
+					Description: "Path to probe. Required: a probe without a path is not saved.",
+					Optional:    true,
+					Computed:    true,
+					PlanModifiers: []planmodifier.String{
+						stringplanmodifier.UseStateForUnknown(),
+					},
 				},
 				"port": schema.Int64Attribute{
 					Description: "Port to probe (1-65535).",
@@ -380,15 +397,25 @@ func probeSchemaAttributes() map[string]schema.Attribute {
 				"http_headers": schema.ListNestedAttribute{
 					Description: "Custom HTTP headers for the probe request.",
 					Optional:    true,
+					Computed:    true,
+					Validators:  []validator.List{listvalidator.SizeAtLeast(1)},
+					PlanModifiers: []planmodifier.List{
+						listplanmodifier.UseStateForUnknown(),
+					},
 					NestedObject: schema.NestedAttributeObject{
+						Validators: []validator.Object{
+							objectvalidator.AlsoRequires(path.MatchRelative().AtName("name"), path.MatchRelative().AtName("value")),
+						},
 						Attributes: map[string]schema.Attribute{
 							"name": schema.StringAttribute{
-								Description: "Header name.",
-								Required:    true,
+								Description: "Header name. Required.",
+								Optional:    true,
+								Computed:    true,
 							},
 							"value": schema.StringAttribute{
-								Description: "Header value.",
-								Required:    true,
+								Description: "Header value. Required.",
+								Optional:    true,
+								Computed:    true,
 							},
 						},
 					},
@@ -519,7 +546,13 @@ func (r *applicationProcessResource) Update(ctx context.Context, req resource.Up
 		return
 	}
 
-	process, err := r.client.UpdateProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString(), updateReq)
+	var process *client.Process
+	var err error
+	if reflect.ValueOf(*updateReq).IsZero() {
+		process, err = r.client.GetProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString())
+	} else {
+		process, err = r.client.UpdateProcess(ctx, state.ApplicationID.ValueString(), state.ID.ValueString(), updateReq)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Application Process", err.Error())
 		return

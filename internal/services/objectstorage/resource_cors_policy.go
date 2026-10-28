@@ -16,6 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 var (
@@ -149,7 +150,7 @@ func (r *objectStorageCORSPolicyResource) Create(ctx context.Context, req resour
 	if len(created) > 1 {
 		var matching []client.CORSPolicy
 		for _, p := range created {
-			if sameStrings(p.AllowedOrigins, createReq.AllowedOrigins) && sameStrings(p.AllowedMethods, createReq.AllowedMethods) && sameStrings(p.AllowedHeaders, createReq.AllowedHeaders) {
+			if listutil.SameElements(p.AllowedOrigins, createReq.AllowedOrigins) && listutil.SameElements(p.AllowedMethods, createReq.AllowedMethods) && listutil.SameElements(p.AllowedHeaders, createReq.AllowedHeaders) {
 				matching = append(matching, p)
 			}
 		}
@@ -308,29 +309,8 @@ func flattenStringList(ctx context.Context, prior types.List, got []string, diag
 	var priorValues []string
 	if !prior.IsNull() && !prior.IsUnknown() {
 		diags.Append(prior.ElementsAs(ctx, &priorValues, false)...)
-		if sameStrings(priorValues, got) {
-			got = priorValues
-		}
 	}
-	list, d := types.ListValueFrom(ctx, types.StringType, got)
+	list, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(priorValues, got))
 	diags.Append(d...)
 	return list
-}
-
-// sameStrings reports whether a and b hold the same elements in any order.
-func sameStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	counts := make(map[string]int, len(a))
-	for _, v := range a {
-		counts[v]++
-	}
-	for _, v := range b {
-		if counts[v] == 0 {
-			return false
-		}
-		counts[v]--
-	}
-	return true
 }

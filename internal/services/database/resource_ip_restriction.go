@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 var (
@@ -210,28 +211,9 @@ func flattenDBIPRestriction(ctx context.Context, output *client.IPRestriction, m
 	if !model.IPList.IsNull() && !model.IPList.IsUnknown() {
 		diags.Append(model.IPList.ElementsAs(ctx, &prior, false)...)
 	}
-	ipList, d := types.ListValueFrom(ctx, types.StringType, keepOrder(prior, output.IPList))
+	ipList, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(prior, output.IPList))
 	diags.Append(d...)
 	model.IPList = ipList
 
 	return diags
-}
-
-// keepOrder returns prior when it holds the same elements as got, so a
-// server-side reordering does not show up as a diff.
-func keepOrder[T comparable](prior, got []T) []T {
-	if len(prior) != len(got) {
-		return got
-	}
-	counts := make(map[T]int, len(got))
-	for _, v := range got {
-		counts[v]++
-	}
-	for _, v := range prior {
-		if counts[v] == 0 {
-			return got
-		}
-		counts[v]--
-	}
-	return prior
 }

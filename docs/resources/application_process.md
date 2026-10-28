@@ -188,24 +188,21 @@ Read-Only:
 <a id="nestedatt--liveness_probe--http_get"></a>
 ### Nested Schema for `liveness_probe.http_get`
 
-Required:
-
-- `path` (String) Path to probe. A probe without a path is not saved.
-
 Optional:
 
 - `host` (String) Hostname for the probe request.
 - `http_headers` (Attributes List) Custom HTTP headers for the probe request. (see [below for nested schema](#nestedatt--liveness_probe--http_get--http_headers))
+- `path` (String) Path to probe. Required: a probe without a path is not saved.
 - `port` (Number) Port to probe (1-65535).
 - `scheme` (String) URI scheme. Valid values: `HTTP`, `HTTPS`.
 
 <a id="nestedatt--liveness_probe--http_get--http_headers"></a>
 ### Nested Schema for `liveness_probe.http_get.http_headers`
 
-Required:
+Optional:
 
-- `name` (String) Header name.
-- `value` (String) Header value.
+- `name` (String) Header name. Required.
+- `value` (String) Header value. Required.
 
 
 
@@ -247,24 +244,21 @@ Read-Only:
 <a id="nestedatt--readiness_probe--http_get"></a>
 ### Nested Schema for `readiness_probe.http_get`
 
-Required:
-
-- `path` (String) Path to probe. A probe without a path is not saved.
-
 Optional:
 
 - `host` (String) Hostname for the probe request.
 - `http_headers` (Attributes List) Custom HTTP headers for the probe request. (see [below for nested schema](#nestedatt--readiness_probe--http_get--http_headers))
+- `path` (String) Path to probe. Required: a probe without a path is not saved.
 - `port` (Number) Port to probe (1-65535).
 - `scheme` (String) URI scheme. Valid values: `HTTP`, `HTTPS`.
 
 <a id="nestedatt--readiness_probe--http_get--http_headers"></a>
 ### Nested Schema for `readiness_probe.http_get.http_headers`
 
-Required:
+Optional:
 
-- `name` (String) Header name.
-- `value` (String) Header value.
+- `name` (String) Header name. Required.
+- `value` (String) Header value. Required.
 
 
 

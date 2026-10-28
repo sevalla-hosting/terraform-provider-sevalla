@@ -29,7 +29,7 @@ resource "sevalla_pipeline" "example" {
 
 ### Optional
 
-- `project_id` (String) The ID of the project the pipeline is grouped under. Adding a pipeline to a project also moves the applications in its stages into the project.
+- `project_id` (String) The ID of the project to group the pipeline under. Adding a pipeline to a project also moves the applications in its stages into the project, and removing it removes them.
 
 ### Read-Only
 

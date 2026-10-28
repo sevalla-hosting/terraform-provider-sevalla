@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/listvalidator"
@@ -232,7 +233,13 @@ func (r *webhookResource) Update(ctx context.Context, req resource.UpdateRequest
 		return
 	}
 
-	webhook, err := r.client.UpdateWebhook(ctx, state.ID.ValueString(), updateReq)
+	var webhook *client.Webhook
+	var err error
+	if reflect.ValueOf(*updateReq).IsZero() {
+		webhook, err = r.client.GetWebhook(ctx, state.ID.ValueString())
+	} else {
+		webhook, err = r.client.UpdateWebhook(ctx, state.ID.ValueString(), updateReq)
+	}
 	if err != nil {
 		resp.Diagnostics.AddError(
 			"Error Updating Webhook",

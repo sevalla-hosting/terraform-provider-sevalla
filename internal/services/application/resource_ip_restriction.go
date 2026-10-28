@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 var (
@@ -200,7 +201,7 @@ func (r *applicationIPRestrictionResource) flattenAppIPRestriction(ctx context.C
 	if !model.IPList.IsNull() && !model.IPList.IsUnknown() {
 		diags.Append(model.IPList.ElementsAs(ctx, &prior, false)...)
 	}
-	ipList, d := types.ListValueFrom(ctx, types.StringType, keepOrder(prior, output.IPList))
+	ipList, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(prior, output.IPList))
 	diags.Append(d...)
 	model.IPList = ipList
 

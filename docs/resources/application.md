@@ -53,7 +53,7 @@ resource "sevalla_application" "docker" {
 
 ### Optional
 
-- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Conflicts with `ignore_deploy_paths`. Set to `[]` to clear.
+- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_cache_enabled` (Boolean) Whether the build cache is enabled.
 - `build_path` (String) The build path within the repository.
@@ -70,7 +70,7 @@ resource "sevalla_application" "docker" {
 - `git_type` (String) The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`.
 - `hibernate_after_seconds` (Number) Number of seconds of inactivity before the application hibernates (1-604800).
 - `hibernation_enabled` (Boolean) Whether hibernation is enabled for the application.
-- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Conflicts with `allow_deploy_paths`. Set to `[]` to clear.
+- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.
 - `nixpacks_version` (String) The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to the platform version.
 - `pack_builder` (String) The Cloud Native Buildpacks builder image when `build_type` is `pack`. Valid values: `heroku/builder:22`, `heroku/builder:24`.
 - `project_id` (String) The ID of the project to group the application under. Changing it moves the application to the new project; removing it from the configuration leaves the application in its current project.

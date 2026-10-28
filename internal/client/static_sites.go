@@ -54,21 +54,21 @@ type CreateStaticSiteRequest struct {
 }
 
 type UpdateStaticSiteRequest struct {
-	DisplayName        *string          `json:"display_name,omitempty"`
-	AutoDeploy         *bool            `json:"auto_deploy,omitempty"`
-	DefaultBranch      *string          `json:"default_branch,omitempty"`
-	BuildCommand       Nullable[string] `json:"build_command,omitzero"`
-	NodeVersion        Nullable[string] `json:"node_version,omitzero"`
-	PublishedDirectory Nullable[string] `json:"published_directory,omitzero"`
-	IsPreviewEnabled   *bool            `json:"is_preview_enabled,omitempty"`
-	GitLFSEnabled      *bool            `json:"git_lfs_enabled,omitempty"`
-	Source             *string          `json:"source,omitempty"`
-	GitType            Nullable[string] `json:"git_type,omitzero"`
-	RepoURL            *string          `json:"repo_url,omitempty"`
-	InstallCommand     Nullable[string] `json:"install_command,omitzero"`
-	RootDirectory      Nullable[string] `json:"root_directory,omitzero"`
-	IndexFile          *string          `json:"index_file,omitempty"`
-	ErrorFile          Nullable[string] `json:"error_file,omitzero"`
+	DisplayName        *string `json:"display_name,omitempty"`
+	AutoDeploy         *bool   `json:"auto_deploy,omitempty"`
+	DefaultBranch      *string `json:"default_branch,omitempty"`
+	BuildCommand       *string `json:"build_command,omitempty"`
+	NodeVersion        *string `json:"node_version,omitempty"`
+	PublishedDirectory *string `json:"published_directory,omitempty"`
+	IsPreviewEnabled   *bool   `json:"is_preview_enabled,omitempty"`
+	GitLFSEnabled      *bool   `json:"git_lfs_enabled,omitempty"`
+	Source             *string `json:"source,omitempty"`
+	GitType            *string `json:"git_type,omitempty"`
+	RepoURL            *string `json:"repo_url,omitempty"`
+	InstallCommand     *string `json:"install_command,omitempty"`
+	RootDirectory      *string `json:"root_directory,omitempty"`
+	IndexFile          *string `json:"index_file,omitempty"`
+	ErrorFile          *string `json:"error_file,omitempty"`
 	// A non-nil empty slice is sent as [] to clear the paths.
 	AllowDeployPaths  []string `json:"allow_deploy_paths,omitzero"`
 	IgnoreDeployPaths []string `json:"ignore_deploy_paths,omitzero"`

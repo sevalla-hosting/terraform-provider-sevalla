@@ -38,6 +38,8 @@ jobs:
         with:
           terraform_wrapper: false
       - run: go test ./... -v -count=1
+      # Every endpoint the client calls must exist in the OpenAPI snapshot.
+      - run: go run ./internal/tools/apicompat/
 
   build:
     name: Build

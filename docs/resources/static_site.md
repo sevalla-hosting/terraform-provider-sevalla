@@ -46,13 +46,13 @@ resource "sevalla_static_site" "private" {
 
 ### Optional
 
-- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Conflicts with `ignore_deploy_paths`. Set to `[]` to clear.
+- `allow_deploy_paths` (List of String) Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_command` (String) The build command to run.
 - `error_file` (String) The error file for the static site.
 - `git_lfs_enabled` (Boolean) Whether Git LFS objects are fetched during the source checkout step. Enabled by default.
 - `git_type` (String) The Git provider type. Valid values: `github`, `bitbucket`, `gitlab`. Null for public Git sources.
-- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Conflicts with `allow_deploy_paths`. Set to `[]` to clear.
+- `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.
 - `index_file` (String) The index file for the static site.
 - `install_command` (String) The install command to run.
 - `is_preview_enabled` (Boolean) Whether preview deployments are enabled.

@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // APIKeyResourceModel is the Terraform state model for the sevalla_api_key resource.
@@ -93,7 +94,7 @@ func flattenAPIKey(ctx context.Context, k *client.APIKey, model *APIKeyResourceM
 	if len(caps) == 0 {
 		model.Capabilities = types.ListNull(capabilityObjectType)
 	} else {
-		v, d := types.ListValueFrom(ctx, capabilityObjectType, keepOrder(priorCaps, caps))
+		v, d := types.ListValueFrom(ctx, capabilityObjectType, listutil.KeepOrder(priorCaps, caps))
 		diags.Append(d...)
 		model.Capabilities = v
 	}
@@ -115,7 +116,7 @@ func flattenAPIKey(ctx context.Context, k *client.APIKey, model *APIKeyResourceM
 	if len(roleIDs) == 0 {
 		model.RoleIDs = types.ListNull(types.StringType)
 	} else {
-		v, d := types.ListValueFrom(ctx, types.StringType, keepOrder(priorRoleIDs, roleIDs))
+		v, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(priorRoleIDs, roleIDs))
 		diags.Append(d...)
 		model.RoleIDs = v
 	}
@@ -189,25 +190,6 @@ func buildUpdateRequest(ctx context.Context, plan, state *APIKeyResourceModel) (
 	}
 
 	return req, diags
-}
-
-// keepOrder returns prior when it holds the same elements as got, so a
-// server-side reordering does not show up as a diff.
-func keepOrder[T comparable](prior, got []T) []T {
-	if len(prior) != len(got) {
-		return got
-	}
-	counts := make(map[T]int, len(got))
-	for _, v := range got {
-		counts[v]++
-	}
-	for _, v := range prior {
-		if counts[v] == 0 {
-			return got
-		}
-		counts[v]--
-	}
-	return prior
 }
 
 func sameInstant(a, b string) bool {

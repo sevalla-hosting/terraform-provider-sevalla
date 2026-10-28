@@ -204,19 +204,16 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"allow_deploy_paths": schema.ListAttribute{
-				Description: "Glob patterns of paths that trigger an automatic deployment when changed. Conflicts with `ignore_deploy_paths`. Set to `[]` to clear.",
+				Description: "Glob patterns of paths that trigger an automatic deployment when changed. Cannot be combined with a non-empty `ignore_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
-				Validators: []validator.List{
-					listvalidator.ConflictsWith(path.MatchRoot("ignore_deploy_paths")),
-				},
 				PlanModifiers: []planmodifier.List{
 					listplanmodifier.UseStateForUnknown(),
 				},
 			},
 			"ignore_deploy_paths": schema.ListAttribute{
-				Description: "Glob patterns of paths that never trigger an automatic deployment. Conflicts with `allow_deploy_paths`. Set to `[]` to clear.",
+				Description: "Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -228,6 +225,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "Custom buildpacks when `build_type` is `pack`. Null for other build types.",
 				Optional:    true,
 				Computed:    true,
+				Validators:  []validator.List{listvalidator.SizeAtLeast(1)},
 				PlanModifiers: []planmodifier.List{
 					nullUnlessBuildType("pack", ""),
 				},

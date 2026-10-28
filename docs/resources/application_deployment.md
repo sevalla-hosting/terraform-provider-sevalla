@@ -44,10 +44,10 @@ resource "sevalla_application_deployment" "release" {
 ### Optional
 
 - `branch` (String) The Git branch to deploy. Defaults to the application's default branch. Only applies to Git-based applications.
-- `commit_sha` (String) The full 40-character SHA of the commit to deploy. Defaults to the latest commit on the branch.
+- `commit_sha` (String) The full 40-character SHA of the commit to deploy. Defaults to the latest commit on the branch. Requires `is_restart = false`.
 - `docker_image` (String) The Docker image reference to deploy (e.g. `nginx:latest`). Only applies to applications with the `dockerImage` source.
 - `is_restart` (Boolean) When true, redeploys the build artifact of the last successful deployment and skips the build step, which is enough to apply runtime changes such as environment variables. Set to `false` to build the latest code. Defaults to `true`.
-- `skip_build_cache` (Boolean) When true, every layer is rebuilt instead of being reused from the build cache. Defaults to `false`.
+- `skip_build_cache` (Boolean) When true, every layer is rebuilt instead of being reused from the build cache. Defaults to `false`. Requires `is_restart = false`.
 - `triggers` (Map of String) A map of arbitrary strings that, when changed, triggers a new deployment. Use this to redeploy when other resources change.
 - `wait_for_completion` (Boolean) When true, apply waits (up to 60 minutes) until the deployment finishes and fails if it fails or is cancelled. Defaults to `false`.
 

@@ -41,7 +41,12 @@ func fakeProcessAPI(t *testing.T) http.HandlerFunc {
 				"scaling_strategy": in["scaling_strategy"], "resource_type_id": in["resource_type_id"],
 				"resource_type_name": "S1", "cpu_limit": 500, "memory_limit": 512,
 				"schedule": nil, "time_zone": nil, "concurrency_policy": nil, "active_deadline_seconds": nil,
-				"job_start_policy": nil, "liveness_probe": probe, "readiness_probe": nil,
+				"job_start_policy": nil, "liveness_probe": probe,
+				// Set outside Terraform (e.g. an imported process); not in the config.
+				"readiness_probe": map[string]any{
+					"httpGet":        map[string]any{"path": "/ready", "port": 8080, "httpHeaders": []any{map[string]any{"name": "X-Probe", "value": "1"}}},
+					"timeoutSeconds": 5,
+				},
 				"internal_hostname": "web.internal", "created_at": "2025-01-01T00:00:00.000Z", "updated_at": "2025-01-01T00:00:00.000Z",
 			}
 			json.NewEncoder(w).Encode(process)

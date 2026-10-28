@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 )
@@ -97,45 +98,31 @@ type IPRestriction struct {
 	IPList    []string `json:"ip_list"`
 }
 
-// WaitForDatabaseStatus polls the database until it reaches one of the target statuses.
-// It polls every 2 seconds for up to maxWait duration.
+// WaitForDatabaseStatus polls the database until it reaches one of the target
+// statuses, and fails when it reaches error or a *Failed status instead.
 func (c *SevallaClient) WaitForDatabaseStatus(ctx context.Context, id string, targetStatuses []string, maxWait time.Duration) (*Database, error) {
-	deadline := time.Now().Add(maxWait)
-	for {
-		db, err := c.GetDatabase(ctx, id)
-		if err != nil {
-			if IsNotFound(err) {
-				return nil, err
-			}
-			return nil, fmt.Errorf("polling database status: %w", err)
+	var db *Database
+	err := Poll(ctx, maxWait, func() (bool, error) {
+		var err error
+		if db, err = c.GetDatabase(ctx, id); err != nil {
+			return false, err
 		}
-
+		status := ""
 		if db.Status != nil {
-			for _, s := range targetStatuses {
-				if *db.Status == s {
-					return db, nil
-				}
-			}
-			// error and the *Failed statuses (e.g. passwordChangeFailed) are final.
-			if *db.Status == "error" || strings.HasSuffix(*db.Status, "Failed") {
-				return nil, fmt.Errorf("database %s is in the %s state", id, *db.Status)
-			}
+			status = *db.Status
 		}
-
-		if time.Now().After(deadline) {
-			currentStatus := "<nil>"
-			if db.Status != nil {
-				currentStatus = *db.Status
-			}
-			return nil, fmt.Errorf("database %s did not reach status %v within %s (current: %s)", id, targetStatuses, maxWait, currentStatus)
+		switch {
+		case slices.Contains(targetStatuses, status):
+			return true, nil
+		case status == "error" || strings.HasSuffix(status, "Failed"):
+			return false, fmt.Errorf("database %s is in the %s state", id, status)
 		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
+		return false, nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	return db, nil
 }
 
 func (c *SevallaClient) ListDatabases(ctx context.Context) ([]DatabaseListItem, error) {

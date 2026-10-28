@@ -6,6 +6,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // WebhookResourceModel is the Terraform state model for the sevalla_webhook resource.
@@ -46,7 +47,7 @@ func flattenWebhook(ctx context.Context, w *client.Webhook, model *WebhookResour
 	if !model.AllowedEvents.IsNull() && !model.AllowedEvents.IsUnknown() {
 		diags.Append(model.AllowedEvents.ElementsAs(ctx, &prior, false)...)
 	}
-	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, keepOrder(prior, w.AllowedEvents))
+	allowedEvents, d := types.ListValueFrom(ctx, types.StringType, listutil.KeepOrder(prior, w.AllowedEvents))
 	diags.Append(d...)
 	model.AllowedEvents = allowedEvents
 
@@ -95,25 +96,6 @@ func buildUpdateRequest(ctx context.Context, plan *WebhookResourceModel, state *
 	}
 
 	return req, diags
-}
-
-// keepOrder returns prior when it holds the same elements as got, so a
-// server-side reordering does not show up as a diff.
-func keepOrder[T comparable](prior, got []T) []T {
-	if len(prior) != len(got) {
-		return got
-	}
-	counts := make(map[T]int, len(got))
-	for _, v := range got {
-		counts[v]++
-	}
-	for _, v := range prior {
-		if counts[v] == 0 {
-			return got
-		}
-		counts[v]--
-	}
-	return prior
 }
 
 // optionalString converts a *string to a types.String, returning null for nil pointers.

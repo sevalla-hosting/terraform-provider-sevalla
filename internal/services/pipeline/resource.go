@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/listplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
@@ -54,12 +55,8 @@ func (r *pipelineResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 				Validators:  []validator.String{stringvalidator.OneOf("trunk", "branch")},
 			},
 			"project_id": schema.StringAttribute{
-				Description: "The ID of the project the pipeline is grouped under. Adding a pipeline to a project also moves the applications in its stages into the project.",
+				Description: "The ID of the project to group the pipeline under. Adding a pipeline to a project also moves the applications in its stages into the project, and removing it removes them.",
 				Optional:    true,
-				Computed:    true,
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
 			},
 			"company_id": schema.StringAttribute{
 				Description: "The company ID that owns the pipeline.",
@@ -71,6 +68,10 @@ func (r *pipelineResource) Schema(_ context.Context, _ resource.SchemaRequest, r
 			"stages": schema.ListNestedAttribute{
 				Description: "The stages of the pipeline ordered by position, including the Dev and Production stages the API creates with the pipeline.",
 				Computed:    true,
+				// Stages are managed by sevalla_pipeline_stage; a pipeline update never changes them.
+				PlanModifiers: []planmodifier.List{
+					listplanmodifier.UseStateForUnknown(),
+				},
 				NestedObject: schema.NestedAttributeObject{
 					Attributes: map[string]schema.Attribute{
 						"id": schema.StringAttribute{
@@ -194,7 +195,11 @@ func (r *pipelineResource) Update(ctx context.Context, req resource.UpdateReques
 		return
 	}
 
+	stages := plan.Stages
 	resp.Diagnostics.Append(flattenPipeline(ctx, pipeline, &plan)...)
+	// Keep the planned stages; changes made by stage resources in the same
+	// apply are picked up by the next refresh.
+	plan.Stages = stages
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
