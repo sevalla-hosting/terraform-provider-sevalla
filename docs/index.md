@@ -26,8 +26,8 @@ The API key can be provided in two ways:
 terraform {
   required_providers {
     sevalla = {
-      source  = "sevalla-hosting/sevalla"
-      version = "~> 0.1"
+      source  = "sevalla/sevalla"
+      version = "~> 1.2"
     }
   }
 }

@@ -93,7 +93,7 @@ func (p *SevallaProvider) Configure(ctx context.Context, req provider.ConfigureR
 		return
 	}
 
-	userAgent := fmt.Sprintf("terraform-provider-sevalla/%s (+https://registry.terraform.io/providers/sevalla-hosting/sevalla) Terraform/%s", p.version, req.TerraformVersion)
+	userAgent := fmt.Sprintf("terraform-provider-sevalla/%s (+https://registry.terraform.io/providers/sevalla/sevalla) Terraform/%s", p.version, req.TerraformVersion)
 	opts := []client.Option{client.WithUserAgent(userAgent)}
 	if apiURL := os.Getenv("SEVALLA_API_URL"); apiURL != "" {
 		parsed, err := url.Parse(apiURL)

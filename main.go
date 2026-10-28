@@ -20,7 +20,7 @@ func main() {
 	flag.Parse()
 
 	opts := providerserver.ServeOpts{
-		Address: "registry.terraform.io/sevalla-hosting/sevalla",
+		Address: "registry.terraform.io/sevalla/sevalla",
 		Debug:   debug,
 	}
 

@@ -1,11 +1,14 @@
 default: build
 
+# The local install must satisfy the version constraint in the configuration.
+VERSION ?= $(shell git describe --tags --abbrev=0 | sed 's/^v//')
+
 build:
 	go build -o terraform-provider-sevalla
 
 install: build
-	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/sevalla-hosting/sevalla/0.1.0/$$(go env GOOS)_$$(go env GOARCH)
-	cp terraform-provider-sevalla ~/.terraform.d/plugins/registry.terraform.io/sevalla-hosting/sevalla/0.1.0/$$(go env GOOS)_$$(go env GOARCH)/
+	mkdir -p ~/.terraform.d/plugins/registry.terraform.io/sevalla/sevalla/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)
+	cp terraform-provider-sevalla ~/.terraform.d/plugins/registry.terraform.io/sevalla/sevalla/$(VERSION)/$$(go env GOOS)_$$(go env GOARCH)/
 
 test:
 	go test ./... -v -count=1
