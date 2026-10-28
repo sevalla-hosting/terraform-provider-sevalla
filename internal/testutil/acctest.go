@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/provider"
+	"github.com/sevalla/terraform-provider-sevalla/internal/provider"
 )
 
 var TestAccProtoV6ProviderFactories = map[string]func() (tfprotov6.ProviderServer, error){

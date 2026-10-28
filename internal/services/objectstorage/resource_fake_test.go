@@ -8,7 +8,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/plancheck"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/testutil"
+	"github.com/sevalla/terraform-provider-sevalla/internal/testutil"
 )
 
 // fakeObjectStorageAPI returns the keys only on create and deletes

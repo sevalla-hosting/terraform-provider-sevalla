@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/testutil"
+	"github.com/sevalla/terraform-provider-sevalla/internal/testutil"
 )
 
 // fakeApplicationAPI keeps the settings of other build types when build_type

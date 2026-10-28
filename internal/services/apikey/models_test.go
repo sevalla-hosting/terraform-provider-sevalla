@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
 )
 
 func TestFlattenAPIKey(t *testing.T) {

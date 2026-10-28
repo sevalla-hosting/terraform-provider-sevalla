@@ -1,4 +1,4 @@
-module github.com/sevalla-hosting/terraform-provider-sevalla
+module github.com/sevalla/terraform-provider-sevalla
 
 go 1.24.0
 

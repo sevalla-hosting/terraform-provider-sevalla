@@ -2,7 +2,7 @@ package project
 
 import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
 )
 
 // ProjectResourceModel is the Terraform state model for the sevalla_project resource.

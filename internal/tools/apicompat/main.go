@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
 )
 
 type OpenAPISpec struct {

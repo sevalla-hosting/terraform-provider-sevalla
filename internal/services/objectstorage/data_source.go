@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
 )
 
 var (

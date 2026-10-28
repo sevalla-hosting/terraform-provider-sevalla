@@ -7,8 +7,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/client"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/services/listutil"
+	"github.com/sevalla/terraform-provider-sevalla/internal/client"
+	"github.com/sevalla/terraform-provider-sevalla/internal/services/listutil"
 )
 
 // APIKeyResourceModel is the Terraform state model for the sevalla_api_key resource.

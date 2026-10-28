@@ -6,7 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/acctest"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
-	"github.com/sevalla-hosting/terraform-provider-sevalla/internal/testutil"
+	"github.com/sevalla/terraform-provider-sevalla/internal/testutil"
 )
 
 func TestAccStaticSite_basic(t *testing.T) {
