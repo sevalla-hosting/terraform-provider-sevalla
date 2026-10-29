@@ -3672,15 +3672,15 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
+                      "description": "Build strategy used to build the application. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. New Git applications use `ingot` by default. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system.",
                       "enum": [
+                        "ingot",
                         "dockerfile",
-                        "pack",
-                        "nixpacks",
                         "railpack",
-                        "ingot"
+                        "pack",
+                        "nixpacks"
                       ],
-                      "example": "nixpacks",
+                      "example": "ingot",
                       "type": "string"
                     },
                     "company_id": {
@@ -3825,7 +3825,7 @@
                       ]
                     },
                     "nixpacks_version": {
-                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies when build type is `nixpacks`.",
+                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies to the deprecated `nixpacks` build type.",
                       "example": "1.21.0",
                       "type": [
                         "string",
@@ -5866,15 +5866,15 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
+                      "description": "Build strategy used to build the application. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. New Git applications use `ingot` by default. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system.",
                       "enum": [
+                        "ingot",
                         "dockerfile",
-                        "pack",
-                        "nixpacks",
                         "railpack",
-                        "ingot"
+                        "pack",
+                        "nixpacks"
                       ],
-                      "example": "nixpacks",
+                      "example": "ingot",
                       "type": "string"
                     },
                     "buildpacks": {
@@ -6085,7 +6085,7 @@
                       ]
                     },
                     "nixpacks_version": {
-                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies when build type is `nixpacks`.",
+                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies to the deprecated `nixpacks` build type.",
                       "example": "1.21.0",
                       "type": [
                         "string",
@@ -6513,15 +6513,15 @@
                     "type": "string"
                   },
                   "build_type": {
-                    "description": "Build strategy to use. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. Each generated version is kept and can be listed under the application's Dockerfiles.",
+                    "description": "Build strategy to use. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. Each generated version is kept and can be listed under the application's Dockerfiles. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system.",
                     "enum": [
+                      "ingot",
                       "dockerfile",
-                      "pack",
-                      "nixpacks",
                       "railpack",
-                      "ingot"
+                      "pack",
+                      "nixpacks"
                     ],
-                    "example": "nixpacks",
+                    "example": "ingot",
                     "type": "string"
                   },
                   "buildpacks": {
@@ -6625,7 +6625,7 @@
                     "type": "array"
                   },
                   "nixpacks_version": {
-                    "description": "Pinned Nixpacks version. When not set, switching to `nixpacks` pins `1.41` and an app already on `nixpacks` keeps its current version. Only applies when build type is `nixpacks`.",
+                    "description": "Pinned Nixpacks version. When not set, switching to `nixpacks` pins `1.41` and an app already on `nixpacks` keeps its current version. Only applies to the deprecated `nixpacks` build type.",
                     "enum": [
                       "1.29",
                       "1.39",
@@ -6702,15 +6702,15 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
+                      "description": "Build strategy used to build the application. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. New Git applications use `ingot` by default. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system.",
                       "enum": [
+                        "ingot",
                         "dockerfile",
-                        "pack",
-                        "nixpacks",
                         "railpack",
-                        "ingot"
+                        "pack",
+                        "nixpacks"
                       ],
-                      "example": "nixpacks",
+                      "example": "ingot",
                       "type": "string"
                     },
                     "company_id": {
@@ -6855,7 +6855,7 @@
                       ]
                     },
                     "nixpacks_version": {
-                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies when build type is `nixpacks`.",
+                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies to the deprecated `nixpacks` build type.",
                       "example": "1.21.0",
                       "type": [
                         "string",
@@ -8343,15 +8343,15 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
+                      "description": "Build strategy used to build the application. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. New Git applications use `ingot` by default. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system.",
                       "enum": [
+                        "ingot",
                         "dockerfile",
-                        "pack",
-                        "nixpacks",
                         "railpack",
-                        "ingot"
+                        "pack",
+                        "nixpacks"
                       ],
-                      "example": "nixpacks",
+                      "example": "ingot",
                       "type": "string"
                     },
                     "company_id": {
@@ -8496,7 +8496,7 @@
                       ]
                     },
                     "nixpacks_version": {
-                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies when build type is `nixpacks`.",
+                      "description": "Pinned Nixpacks version. When null, the platform default version is used. Only applies to the deprecated `nixpacks` build type.",
                       "example": "1.21.0",
                       "type": [
                         "string",
@@ -10067,7 +10067,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile`. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                            "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile` once the deployment finishes, so a deployment that is still building returns null. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse from the start. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
                             "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
                           },
                           "finished_at": {
@@ -10598,6 +10598,20 @@
                         "null"
                       ]
                     },
+                    "dockerfile_id": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile` once the deployment finishes, so a deployment that is still building returns null. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse from the start. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                      "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
+                    },
                     "finished_at": {
                       "anyOf": [
                         {
@@ -10765,7 +10779,8 @@
                     "started_at",
                     "finished_at",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "dockerfile_id"
                   ],
                   "type": "object"
                 }
@@ -11055,7 +11070,7 @@
     },
     "/applications/{id}/deployments/rollback": {
       "post": {
-        "description": "Roll back an application to the most recent successful deployment. This creates a new deployment that reuses the build artifact from the previous successful deployment, skipping the build step entirely.",
+        "description": "Roll back an application to its most recent successful deployment of a different commit than the latest deployment. This creates a new deployment that reuses the build artifact of that deployment, skipping the build step entirely. Returns 404 when no successful deployment of another commit exists.",
         "operationId": "rollbackDeploymentV3",
         "parameters": [
           {
@@ -11146,6 +11161,20 @@
                         "string",
                         "null"
                       ]
+                    },
+                    "dockerfile_id": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile` once the deployment finishes, so a deployment that is still building returns null. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse from the start. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                      "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
                     },
                     "finished_at": {
                       "anyOf": [
@@ -11314,7 +11343,8 @@
                     "started_at",
                     "finished_at",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "dockerfile_id"
                   ],
                   "type": "object"
                 }
@@ -11674,7 +11704,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile`. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                      "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile` once the deployment finishes, so a deployment that is still building returns null. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse from the start. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
                       "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
                     },
                     "finished_at": {
@@ -34408,7 +34438,7 @@
     },
     "/applications/{id}/processes/{process_id}/trigger": {
       "post": {
-        "description": "Manually trigger an immediate execution of a cron process. This creates a one-off run outside of the regular cron schedule. The process must be of type `cron`. The run uses the same job template as scheduled runs. Returns 403 if the application or its company is suspended.",
+        "description": "Manually trigger an immediate execution of a cron process. This creates a one-off run outside of the regular cron schedule. The process must be of type `cron`. The run uses the same job template as scheduled runs and shows up in the cron run history with the `manual` trigger. Returns 403 if the application or its company is suspended.",
         "operationId": "triggerProcessCronV3",
         "parameters": [
           {
@@ -65753,13 +65783,13 @@
                         "type": "string"
                       },
                       "build_type": {
-                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code. Defaults to `ingot`.",
+                        "description": "Build strategy for preview apps. `ingot` - build using a Dockerfile that Ingot generates from the source code. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system. Defaults to `ingot`.",
                         "enum": [
+                          "ingot",
                           "dockerfile",
-                          "pack",
-                          "nixpacks",
                           "railpack",
-                          "ingot"
+                          "pack",
+                          "nixpacks"
                         ],
                         "example": "dockerfile",
                         "type": "string"
@@ -67573,13 +67603,13 @@
                         "type": "string"
                       },
                       "build_type": {
-                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code. Defaults to `ingot`.",
+                        "description": "Build strategy for preview apps. `ingot` - build using a Dockerfile that Ingot generates from the source code. `dockerfile` - build using the Dockerfile from your repository. `railpack` - auto-detected build system, successor to Nixpacks. `pack` - build using Cloud Native Buildpacks. `nixpacks` - deprecated, use `ingot` instead. Auto-detected build system. Defaults to `ingot`.",
                         "enum": [
+                          "ingot",
                           "dockerfile",
-                          "pack",
-                          "nixpacks",
                           "railpack",
-                          "ingot"
+                          "pack",
+                          "nixpacks"
                         ],
                         "example": "dockerfile",
                         "type": "string"

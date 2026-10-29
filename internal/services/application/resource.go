@@ -119,7 +119,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"build_type": schema.StringAttribute{
-				Description: "The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). Defaults to the platform default, `ingot`.",
+				Description: "The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). New Git applications default to `ingot`.",
 				Optional:    true,
 				Computed:    true,
 				Validators:  []validator.String{stringvalidator.OneOf("ingot", "dockerfile", "pack", "railpack", "nixpacks")},
@@ -362,7 +362,7 @@ func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.V
 	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("build_type"), &buildType)...)
 	if buildType.ValueString() == "nixpacks" {
 		resp.Diagnostics.AddAttributeWarning(path.Root("build_type"), "Deprecated Build Type",
-			"Nixpacks is deprecated. Use `ingot`, the default builder, or `railpack` instead.")
+			"Nixpacks is deprecated. Use `ingot` instead.")
 	}
 }
 

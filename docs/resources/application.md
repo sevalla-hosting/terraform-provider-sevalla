@@ -57,7 +57,7 @@ resource "sevalla_application" "docker" {
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_cache_enabled` (Boolean) Whether the build cache is enabled.
 - `build_path` (String) The build path within the repository.
-- `build_type` (String) The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). Defaults to the platform default, `ingot`.
+- `build_type` (String) The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). New Git applications default to `ingot`.
 - `buildpacks` (Attributes List) Custom buildpacks when `build_type` is `pack`. Null for other build types. (see [below for nested schema](#nestedatt--buildpacks))
 - `cdn_enabled` (Boolean) Whether the CDN is enabled for the application.
 - `default_branch` (String) The default branch to deploy from. Defaults to the repository's default branch.
