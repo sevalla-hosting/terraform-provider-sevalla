@@ -15,7 +15,7 @@ resource "sevalla_application" "private" {
   repo_url       = "https://github.com/myorg/private-repo"
   default_branch = "main"
   auto_deploy    = true
-  build_type     = "nixpacks"
+  build_type     = "ingot"
 }
 
 # Deploy from a Docker image

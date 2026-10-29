@@ -47,6 +47,7 @@ type Application struct {
 	HibernateAfterSeconds      *int64            `json:"hibernate_after_seconds"`
 	AutoDeploy                 bool              `json:"auto_deploy"`
 	IsSuspended                bool              `json:"is_suspended"`
+	SuspensionStatus           string            `json:"suspension_status"`
 	IsCDNEnabled               *bool             `json:"is_cdn_enabled"`
 	IsEdgeCacheEnabled         *bool             `json:"is_edge_cache_enabled"`
 	ClusterID                  *string           `json:"cluster_id"`
@@ -120,15 +121,16 @@ type Deployment struct {
 }
 
 type ApplicationListItem struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	DisplayName string  `json:"display_name"`
-	Status      *string `json:"status"`
-	Type        string  `json:"type"`
-	Source      string  `json:"source"`
-	IsSuspended bool    `json:"is_suspended"`
-	CreatedAt   string  `json:"created_at"`
-	UpdatedAt   string  `json:"updated_at"`
+	ID               string  `json:"id"`
+	Name             string  `json:"name"`
+	DisplayName      string  `json:"display_name"`
+	Status           *string `json:"status"`
+	Type             string  `json:"type"`
+	Source           string  `json:"source"`
+	IsSuspended      bool    `json:"is_suspended"`
+	SuspensionStatus string  `json:"suspension_status"`
+	CreatedAt        string  `json:"created_at"`
+	UpdatedAt        string  `json:"updated_at"`
 }
 
 type APIKeyPermission struct {

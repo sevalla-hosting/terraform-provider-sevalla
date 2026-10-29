@@ -39,5 +39,6 @@ Read-Only:
 - `name` (String) The system-generated name of the application.
 - `source` (String) The source type of the application.
 - `status` (String) The current status of the application.
+- `suspension_status` (String) Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.
 - `type` (String) The application type.
 - `updated_at` (String) When the application was last updated.

@@ -26,9 +26,10 @@ import (
 )
 
 var (
-	_ resource.Resource                = &applicationResource{}
-	_ resource.ResourceWithConfigure   = &applicationResource{}
-	_ resource.ResourceWithImportState = &applicationResource{}
+	_ resource.Resource                   = &applicationResource{}
+	_ resource.ResourceWithConfigure      = &applicationResource{}
+	_ resource.ResourceWithImportState    = &applicationResource{}
+	_ resource.ResourceWithValidateConfig = &applicationResource{}
 )
 
 type applicationResource struct {
@@ -118,11 +119,10 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"build_type": schema.StringAttribute{
-				Description: "The build type. Valid values: `dockerfile`, `pack` (Cloud Native Buildpacks), `nixpacks`, `railpack`. Defaults to `dockerfile`.",
+				Description: "The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). Defaults to the platform default, `ingot`.",
 				Optional:    true,
 				Computed:    true,
-				Default:     stringdefault.StaticString("dockerfile"),
-				Validators:  []validator.String{stringvalidator.OneOf("dockerfile", "pack", "nixpacks", "railpack")},
+				Validators:  []validator.String{stringvalidator.OneOf("ingot", "dockerfile", "pack", "railpack", "nixpacks")},
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -195,7 +195,7 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				},
 			},
 			"nixpacks_version": schema.StringAttribute{
-				Description: "The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to the platform version.",
+				Description: "The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to `1.41`. Nixpacks is deprecated.",
 				Optional:    true,
 				Computed:    true,
 				Validators:  []validator.String{stringvalidator.OneOf("1.29", "1.39", "1.41")},
@@ -313,6 +313,10 @@ func (r *applicationResource) Schema(_ context.Context, _ resource.SchemaRequest
 				Description: "Whether the application is currently suspended.",
 				Computed:    true,
 			},
+			"suspension_status": schema.StringAttribute{
+				Description: "Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.",
+				Computed:    true,
+			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the application.",
 				Computed:    true,
@@ -350,6 +354,16 @@ func (r *applicationResource) Configure(_ context.Context, req resource.Configur
 	}
 
 	r.client = c
+}
+
+// ValidateConfig warns about the deprecated Nixpacks builder.
+func (r *applicationResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var buildType types.String
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("build_type"), &buildType)...)
+	if buildType.ValueString() == "nixpacks" {
+		resp.Diagnostics.AddAttributeWarning(path.Root("build_type"), "Deprecated Build Type",
+			"Nixpacks is deprecated. Use `ingot`, the default builder, or `railpack` instead.")
+	}
 }
 
 func (r *applicationResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {

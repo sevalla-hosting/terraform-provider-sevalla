@@ -3216,7 +3216,7 @@
                             "type": "string"
                           },
                           "is_suspended": {
-                            "description": "Whether the application is currently suspended. Suspended applications have all processes stopped but retain their configuration.",
+                            "description": "Whether the application is suspended or is being suspended. It turns true as soon as a suspension is requested and back to false once an activation has started every process or has failed. While it is true, deployments are skipped instead of run and manual cron runs are refused. Use `suspension_status` to see whether every process has actually stopped.",
                             "example": false,
                             "type": "boolean"
                           },
@@ -3258,6 +3258,19 @@
                             "description": "Current status of the application reflecting the most recent deployment or lifecycle operation",
                             "example": "deploymentSuccess"
                           },
+                          "suspension_status": {
+                            "description": "Where the application is in the suspend and activate flow. `active` - running normally. `suspending` - a suspension was requested and processes are being stopped. `suspended` - every process was verified stopped: web and worker processes have no instances left, cron schedules are paused and no cron or job run is executing. `suspensionFailed` - some processes could not be verified stopped; request the suspension again. `activating` - an activation was requested and processes are being started. `activationFailed` - some processes could not be started; deployments are allowed again, request the activation again to start every process.",
+                            "enum": [
+                              "active",
+                              "suspending",
+                              "suspended",
+                              "suspensionFailed",
+                              "activating",
+                              "activationFailed"
+                            ],
+                            "example": "active",
+                            "type": "string"
+                          },
                           "type": {
                             "description": "Application type. `app` - standard application. `previewApp` - ephemeral preview environment created from a pull request.",
                             "enum": [
@@ -3283,6 +3296,7 @@
                           "type",
                           "source",
                           "is_suspended",
+                          "suspension_status",
                           "created_at",
                           "updated_at"
                         ],
@@ -3658,7 +3672,7 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile generated from the source code, currently limited to internal testing.",
+                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
                       "enum": [
                         "dockerfile",
                         "pack",
@@ -3791,7 +3805,7 @@
                       "type": "array"
                     },
                     "is_suspended": {
-                      "description": "Whether the application is currently suspended. Suspended applications have all processes stopped but retain their configuration.",
+                      "description": "Whether the application is suspended or is being suspended. It turns true as soon as a suspension is requested and back to false once an activation has started every process or has failed. While it is true, deployments are skipped instead of run and manual cron runs are refused. Use `suspension_status` to see whether every process has actually stopped.",
                       "example": false,
                       "type": "boolean"
                     },
@@ -5852,7 +5866,7 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile generated from the source code, currently limited to internal testing.",
+                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
                       "enum": [
                         "dockerfile",
                         "pack",
@@ -6051,7 +6065,7 @@
                       ]
                     },
                     "is_suspended": {
-                      "description": "Whether the application is currently suspended. Suspended applications have all processes stopped but retain their configuration.",
+                      "description": "Whether the application is suspended or is being suspended. It turns true as soon as a suspension is requested and back to false once an activation has started every process or has failed. While it is true, deployments are skipped instead of run and manual cron runs are refused. Use `suspension_status` to see whether every process has actually stopped.",
                       "example": false,
                       "type": "boolean"
                     },
@@ -6139,6 +6153,63 @@
                       "description": "Current status of the application reflecting the most recent deployment or lifecycle operation",
                       "example": "deploymentSuccess"
                     },
+                    "suspended_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Timestamp when every process of the application was verified stopped, in ISO 8601 format. Null until the suspension completes, and for applications suspended before this field existed.",
+                      "example": "2025-01-30T00:00:00.000Z"
+                    },
+                    "suspension_requested_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Timestamp when the current suspension was requested, in ISO 8601 format. Null when the application is active.",
+                      "example": "2025-01-30T00:00:00.000Z"
+                    },
+                    "suspension_source": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "user",
+                            "company"
+                          ],
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Who suspended the application. `user` - suspended through the dashboard or the API; it stays suspended until it is activated. `company` - suspended together with its company; it is activated again when the company is reactivated. Null when the application is active.",
+                      "example": null
+                    },
+                    "suspension_status": {
+                      "description": "Where the application is in the suspend and activate flow. `active` - running normally. `suspending` - a suspension was requested and processes are being stopped. `suspended` - every process was verified stopped: web and worker processes have no instances left, cron schedules are paused and no cron or job run is executing. `suspensionFailed` - some processes could not be verified stopped; request the suspension again. `activating` - an activation was requested and processes are being started. `activationFailed` - some processes could not be started; deployments are allowed again, request the activation again to start every process.",
+                      "enum": [
+                        "active",
+                        "suspending",
+                        "suspended",
+                        "suspensionFailed",
+                        "activating",
+                        "activationFailed"
+                      ],
+                      "example": "active",
+                      "type": "string"
+                    },
                     "type": {
                       "description": "Application type. `app` - standard application. `previewApp` - ephemeral preview environment created from a pull request.",
                       "enum": [
@@ -6172,6 +6243,10 @@
                     "hibernate_after_seconds",
                     "auto_deploy",
                     "is_suspended",
+                    "suspension_status",
+                    "suspension_source",
+                    "suspension_requested_at",
+                    "suspended_at",
                     "is_cdn_enabled",
                     "is_edge_cache_enabled",
                     "git_type",
@@ -6438,12 +6513,13 @@
                     "type": "string"
                   },
                   "build_type": {
-                    "description": "Build strategy to use. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks.",
+                    "description": "Build strategy to use. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build. Each generated version is kept and can be listed under the application's Dockerfiles.",
                     "enum": [
                       "dockerfile",
                       "pack",
                       "nixpacks",
-                      "railpack"
+                      "railpack",
+                      "ingot"
                     ],
                     "example": "nixpacks",
                     "type": "string"
@@ -6549,7 +6625,7 @@
                     "type": "array"
                   },
                   "nixpacks_version": {
-                    "description": "Pinned Nixpacks version. When not set, the platform default version is used. Only applies when build type is `nixpacks`.",
+                    "description": "Pinned Nixpacks version. When not set, switching to `nixpacks` pins `1.41` and an app already on `nixpacks` keeps its current version. Only applies when build type is `nixpacks`.",
                     "enum": [
                       "1.29",
                       "1.39",
@@ -6626,7 +6702,7 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile generated from the source code, currently limited to internal testing.",
+                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
                       "enum": [
                         "dockerfile",
                         "pack",
@@ -6759,7 +6835,7 @@
                       "type": "array"
                     },
                     "is_suspended": {
-                      "description": "Whether the application is currently suspended. Suspended applications have all processes stopped but retain their configuration.",
+                      "description": "Whether the application is suspended or is being suspended. It turns true as soon as a suspension is requested and back to false once an activation has started every process or has failed. While it is true, deployments are skipped instead of run and manual cron runs are refused. Use `suspension_status` to see whether every process has actually stopped.",
                       "example": false,
                       "type": "boolean"
                     },
@@ -7634,7 +7710,7 @@
     },
     "/applications/{id}/activate": {
       "post": {
-        "description": "Activate a previously suspended application, restoring all processes to their running state. The operation is asynchronous - the application status will transition once activation completes.",
+        "description": "Activate a suspended application. The request returns right away and the activation runs in the background: web and worker processes are scaled back to their configured instance counts and cron schedules resume. A cron that missed scheduled runs during the suspension starts one run straight away. Poll the get application endpoint until `suspension_status` is `active`. Deployments are skipped while `is_suspended` is true. If `suspension_status` turns `activationFailed`, some processes could not be started: call this endpoint again.",
         "operationId": "activateApplicationV3",
         "parameters": [
           {
@@ -8267,7 +8343,7 @@
                       ]
                     },
                     "build_type": {
-                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile generated from the source code, currently limited to internal testing.",
+                      "description": "Build strategy used to build the application. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code on every build.",
                       "enum": [
                         "dockerfile",
                         "pack",
@@ -8400,7 +8476,7 @@
                       "type": "array"
                     },
                     "is_suspended": {
-                      "description": "Whether the application is currently suspended. Suspended applications have all processes stopped but retain their configuration.",
+                      "description": "Whether the application is suspended or is being suspended. It turns true as soon as a suspension is requested and back to false once an activation has started every process or has failed. While it is true, deployments are skipped instead of run and manual cron runs are refused. Use `suspension_status` to see whether every process has actually stopped.",
                       "example": false,
                       "type": "boolean"
                     },
@@ -9980,6 +10056,20 @@
                               "null"
                             ]
                           },
+                          "dockerfile_id": {
+                            "anyOf": [
+                              {
+                                "format": "uuid",
+                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile`. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                            "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
+                          },
                           "finished_at": {
                             "anyOf": [
                               {
@@ -10147,7 +10237,8 @@
                           "started_at",
                           "finished_at",
                           "created_at",
-                          "updated_at"
+                          "updated_at",
+                          "dockerfile_id"
                         ],
                         "type": "object"
                       },
@@ -11572,6 +11663,20 @@
                         "null"
                       ]
                     },
+                    "dockerfile_id": {
+                      "anyOf": [
+                        {
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Identifier of the Dockerfile the deployment's image was built from. Set for applications built with `ingot` or `dockerfile`. Rollbacks, restarts and promotions point at the Dockerfile of the image they reuse. Null for other build types, for Docker image applications, and for a build that failed before its Dockerfile could be read.",
+                      "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657"
+                    },
                     "finished_at": {
                       "anyOf": [
                         {
@@ -11739,7 +11844,8 @@
                     "started_at",
                     "finished_at",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "dockerfile_id"
                   ],
                   "type": "object"
                 }
@@ -12723,6 +12829,813 @@
           }
         },
         "summary": "Get application deployment logs",
+        "tags": [
+          "Applications"
+        ],
+        "x-required-permissions": [
+          "APP:READ"
+        ]
+      }
+    },
+    "/applications/{id}/dockerfiles": {
+      "get": {
+        "description": "List the Dockerfiles an application was built from, newest version first: the ones Sevalla generated with Ingot (`source: ingot`) and the ones from your repository (`source: user`). A build adds a new version only when its Dockerfile, .dockerignore or source differs from the latest one, so the list shows every change. Each deployment points at its version through `dockerfile_id`. Applications that were never built with `ingot` or `dockerfile` have an empty list.",
+        "operationId": "listApplicationDockerfilesV3",
+        "parameters": [
+          {
+            "description": "Maximum number of items per page",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "example": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of items to skip",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "example": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Application identifier",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "description": "List of items",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "app_id": {
+                            "description": "Identifier of the application the Dockerfile belongs to",
+                            "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "description": "Timestamp when the Dockerfile version was first recorded, in ISO 8601 format",
+                            "example": "2025-01-30T00:00:00.000Z",
+                            "format": "date-time",
+                            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                            "type": "string"
+                          },
+                          "dockerfile": {
+                            "description": "Content of the Dockerfile",
+                            "example": "FROM node:22-slim AS build",
+                            "type": "string"
+                          },
+                          "dockerignore": {
+                            "description": "Content of the .dockerignore the build used. For `user` Dockerfiles this is `<Dockerfile>.dockerignore` next to the Dockerfile, or else `.dockerignore` in the build context, the same file Docker picks. Null when there is none.",
+                            "example": "node_modules",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "facts": {
+                            "description": "What Ingot detected about the application, such as its framework, runtime version and package manager, each with the file it came from. For `ingot` Dockerfiles these are the decisions listed in the Dockerfile header. Empty when `language` is null.",
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "name": {
+                                  "description": "What was detected, such as `framework`, `package manager`, or the language name for its version",
+                                  "example": "framework",
+                                  "type": "string"
+                                },
+                                "source": {
+                                  "description": "Where the value came from, usually a file in the repository. `default` means nothing in the repository set it and Ingot used its default.",
+                                  "example": "composer.json",
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "description": "The detected value",
+                                  "example": "Laravel",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "value"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "id": {
+                            "description": "Unique identifier for the Dockerfile version",
+                            "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "ingot_version": {
+                            "description": "Version of Ingot that first generated this Dockerfile. When it differs from the previous version, the change may come from an Ingot upgrade rather than from the application. Null for `user` Dockerfiles.",
+                            "example": "v0.3.2",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "language": {
+                            "description": "Language Ingot detected in the application source, such as `node`, `python`, `php`, `go`, `ruby`, `rust`, `java`, `dotnet`, `elixir`, `deno`, `gleam`, `zig`, `cpp`, `static` (a static site) or `shell` (a start.sh script). For `user` Dockerfiles it is detected from the repository and does not come from your Dockerfile. Null when Ingot could not detect the application, and for versions recorded before this field existed.",
+                            "example": "php",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "processes": {
+                            "description": "Processes Ingot recommends running from the same image besides the web process, such as queue workers, schedulers or database migrations. These are suggestions and are not created for you.",
+                            "items": {
+                              "additionalProperties": false,
+                              "properties": {
+                                "command": {
+                                  "description": "Command to run from the same image",
+                                  "example": "php artisan queue:work",
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "description": "Type of process: `worker` - a command that runs continuously next to the web server; `job` - a command that runs to completion before each deployment",
+                                  "example": "worker",
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "description": "Short name of the process",
+                                  "example": "queue",
+                                  "type": "string"
+                                },
+                                "reason": {
+                                  "description": "What in the application calls for the process",
+                                  "example": "app/Jobs/RecordVisit.php queues work",
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "kind",
+                                "name",
+                                "command",
+                                "reason"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "source": {
+                            "description": "Where the Dockerfile comes from: `ingot` - generated by Sevalla with Ingot for an application built with `ingot`; `user` - the Dockerfile from your repository, for an application built with `dockerfile`",
+                            "enum": [
+                              "ingot",
+                              "user"
+                            ],
+                            "example": "ingot",
+                            "type": "string"
+                          },
+                          "version": {
+                            "description": "Version number of the Dockerfile within its application, starting at 1. A new version is recorded only when a build uses a Dockerfile, .dockerignore or source that differs from the latest version. Otherwise the build reuses the latest version and updates its `language`, `facts` and `processes` to what Ingot detected, unless Ingot detected nothing.",
+                            "example": 3,
+                            "maximum": 9007199254740991,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "app_id",
+                          "version",
+                          "source",
+                          "dockerfile",
+                          "dockerignore",
+                          "ingot_version",
+                          "language",
+                          "facts",
+                          "processes",
+                          "created_at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "limit": {
+                      "description": "Current pagination limit",
+                      "example": 25,
+                      "maximum": 100,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "description": "Current pagination offset",
+                      "example": 0,
+                      "maximum": 10000,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "description": "Total number of items matching the query",
+                      "example": 42,
+                      "maximum": 10000,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "offset",
+                    "limit"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Unauthorized",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 401,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "This API key is missing the <RESOURCE>:<ACTION> permission. Grant it to the key or use a key that has it.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 403,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Not found",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 404,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Internal Server Error",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 500,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List Dockerfiles",
+        "tags": [
+          "Applications"
+        ],
+        "x-required-permissions": [
+          "APP:READ"
+        ]
+      }
+    },
+    "/applications/{id}/dockerfiles/{dockerfile_id}": {
+      "get": {
+        "description": "Retrieve one Dockerfile version of an application, with the Dockerfile, its .dockerignore and whether Sevalla generated it with Ingot or it came from your repository. Use it with the `dockerfile_id` of a deployment to see what that deployment was built from, or fetch two versions to compare them.",
+        "operationId": "getApplicationDockerfileV3",
+        "parameters": [
+          {
+            "description": "Application identifier",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Dockerfile identifier, as returned in `dockerfile_id` of a deployment",
+            "in": "path",
+            "name": "dockerfile_id",
+            "required": true,
+            "schema": {
+              "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "app_id": {
+                      "description": "Identifier of the application the Dockerfile belongs to",
+                      "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "description": "Timestamp when the Dockerfile version was first recorded, in ISO 8601 format",
+                      "example": "2025-01-30T00:00:00.000Z",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                      "type": "string"
+                    },
+                    "dockerfile": {
+                      "description": "Content of the Dockerfile",
+                      "example": "FROM node:22-slim AS build",
+                      "type": "string"
+                    },
+                    "dockerignore": {
+                      "description": "Content of the .dockerignore the build used. For `user` Dockerfiles this is `<Dockerfile>.dockerignore` next to the Dockerfile, or else `.dockerignore` in the build context, the same file Docker picks. Null when there is none.",
+                      "example": "node_modules",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "facts": {
+                      "description": "What Ingot detected about the application, such as its framework, runtime version and package manager, each with the file it came from. For `ingot` Dockerfiles these are the decisions listed in the Dockerfile header. Empty when `language` is null.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "name": {
+                            "description": "What was detected, such as `framework`, `package manager`, or the language name for its version",
+                            "example": "framework",
+                            "type": "string"
+                          },
+                          "source": {
+                            "description": "Where the value came from, usually a file in the repository. `default` means nothing in the repository set it and Ingot used its default.",
+                            "example": "composer.json",
+                            "type": "string"
+                          },
+                          "value": {
+                            "description": "The detected value",
+                            "example": "Laravel",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "id": {
+                      "description": "Unique identifier for the Dockerfile version",
+                      "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                      "type": "string"
+                    },
+                    "ingot_version": {
+                      "description": "Version of Ingot that first generated this Dockerfile. When it differs from the previous version, the change may come from an Ingot upgrade rather than from the application. Null for `user` Dockerfiles.",
+                      "example": "v0.3.2",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "language": {
+                      "description": "Language Ingot detected in the application source, such as `node`, `python`, `php`, `go`, `ruby`, `rust`, `java`, `dotnet`, `elixir`, `deno`, `gleam`, `zig`, `cpp`, `static` (a static site) or `shell` (a start.sh script). For `user` Dockerfiles it is detected from the repository and does not come from your Dockerfile. Null when Ingot could not detect the application, and for versions recorded before this field existed.",
+                      "example": "php",
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "processes": {
+                      "description": "Processes Ingot recommends running from the same image besides the web process, such as queue workers, schedulers or database migrations. These are suggestions and are not created for you.",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "command": {
+                            "description": "Command to run from the same image",
+                            "example": "php artisan queue:work",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "description": "Type of process: `worker` - a command that runs continuously next to the web server; `job` - a command that runs to completion before each deployment",
+                            "example": "worker",
+                            "type": "string"
+                          },
+                          "name": {
+                            "description": "Short name of the process",
+                            "example": "queue",
+                            "type": "string"
+                          },
+                          "reason": {
+                            "description": "What in the application calls for the process",
+                            "example": "app/Jobs/RecordVisit.php queues work",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "name",
+                          "command",
+                          "reason"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "source": {
+                      "description": "Where the Dockerfile comes from: `ingot` - generated by Sevalla with Ingot for an application built with `ingot`; `user` - the Dockerfile from your repository, for an application built with `dockerfile`",
+                      "enum": [
+                        "ingot",
+                        "user"
+                      ],
+                      "example": "ingot",
+                      "type": "string"
+                    },
+                    "version": {
+                      "description": "Version number of the Dockerfile within its application, starting at 1. A new version is recorded only when a build uses a Dockerfile, .dockerignore or source that differs from the latest version. Otherwise the build reuses the latest version and updates its `language`, `facts` and `processes` to what Ingot detected, unless Ingot detected nothing.",
+                      "example": 3,
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "app_id",
+                    "version",
+                    "source",
+                    "dockerfile",
+                    "dockerignore",
+                    "ingot_version",
+                    "language",
+                    "facts",
+                    "processes",
+                    "created_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Unauthorized",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 401,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "This API key is missing the <RESOURCE>:<ACTION> permission. Grant it to the key or use a key that has it.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 403,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Not found",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 404,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Internal Server Error",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 500,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "Get Dockerfile",
         "tags": [
           "Applications"
         ],
@@ -24438,6 +25351,20 @@
                             "description": "Cron expression defining the execution schedule. Only applicable to cron processes.",
                             "example": "0 * * * *"
                           },
+                          "stopped_at": {
+                            "anyOf": [
+                              {
+                                "format": "date-time",
+                                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Timestamp when the process was verified stopped during the current suspension of its application, in ISO 8601 format. Null while the application is active, while the process is still stopping, and for applications suspended before this field existed.",
+                            "example": "2025-01-30T00:00:00.000Z"
+                          },
                           "time_zone": {
                             "anyOf": [
                               {
@@ -24501,6 +25428,7 @@
                           "readiness_probe",
                           "internal_hostname",
                           "disk",
+                          "stopped_at",
                           "created_at",
                           "updated_at"
                         ],
@@ -27817,6 +28745,20 @@
                       "description": "Cron expression defining the execution schedule. Only applicable to cron processes.",
                       "example": "0 * * * *"
                     },
+                    "stopped_at": {
+                      "anyOf": [
+                        {
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Timestamp when the process was verified stopped during the current suspension of its application, in ISO 8601 format. Null while the application is active, while the process is still stopping, and for applications suspended before this field existed.",
+                      "example": "2025-01-30T00:00:00.000Z"
+                    },
                     "time_zone": {
                       "anyOf": [
                         {
@@ -27880,6 +28822,7 @@
                     "readiness_probe",
                     "internal_hostname",
                     "disk",
+                    "stopped_at",
                     "created_at",
                     "updated_at"
                   ],
@@ -32725,6 +33668,449 @@
         ]
       }
     },
+    "/applications/{id}/processes/{process_id}/runs": {
+      "get": {
+        "description": "Retrieve the run history of a cron process, newest first. Each run shows when it was due, when it started and finished, its outcome, the failure reason and exit code, how many times it was retried, and whether it was scheduled or triggered manually. Runs are kept for 30 days. Processes of other types have no runs.",
+        "operationId": "listProcessCronRunsV3",
+        "parameters": [
+          {
+            "description": "Maximum number of items per page",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "example": 25,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Number of items to skip",
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "example": 0,
+              "maximum": 10000,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Application identifier",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Process identifier",
+            "in": "path",
+            "name": "process_id",
+            "required": true,
+            "schema": {
+              "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "description": "List of items",
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "exit_code": {
+                            "anyOf": [
+                              {
+                                "maximum": 9007199254740991,
+                                "minimum": -9007199254740991,
+                                "type": "integer"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Exit code of the last attempt, or null while the first attempt is still running. 0 - success, 1 - error, 137 - killed, often for running out of memory, 143 - terminated.",
+                            "example": 0
+                          },
+                          "finished_at": {
+                            "description": "When the run succeeded or failed, in ISO 8601 format, or null while it is running",
+                            "example": "2026-10-29T10:00:00.000Z",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "id": {
+                            "description": "Cron run identifier",
+                            "example": "b3f1c2d4-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "job_name": {
+                            "description": "Name of the Kubernetes Job of the run. Its pods, and their runtime logs, start with this name.",
+                            "example": "my-app-abc12-cleanup-29512345",
+                            "type": "string"
+                          },
+                          "process_id": {
+                            "description": "Cron process the run belongs to",
+                            "example": "fb5e5168-4281-4bec-94c5-0d1584e9e657",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+                            "type": "string"
+                          },
+                          "reason": {
+                            "description": "Why a failed run failed, null otherwise. `BackoffLimitExceeded` - the command kept failing after its retry. `DeadlineExceeded` - the run took longer than the maximum run time of the process. `Deleted` - the run was stopped before it finished, for example replaced by the next run when the concurrency policy is `Replace`.",
+                            "example": "BackoffLimitExceeded",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "retries": {
+                            "description": "Number of times the command was restarted after it failed within this run",
+                            "example": 0,
+                            "maximum": 9007199254740991,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "scheduled_at": {
+                            "description": "When the run was due, in ISO 8601 format. For manual runs, when it was triggered.",
+                            "example": "2026-10-29T10:00:00.000Z",
+                            "type": "string"
+                          },
+                          "started_at": {
+                            "description": "When the run started, in ISO 8601 format, or null if it has not started yet",
+                            "example": "2026-10-29T10:00:00.000Z",
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "description": "Outcome of the run. `running` - the run has not finished yet. `succeeded` - the command exited with code 0. `failed` - the run gave up, see `reason` and `exit_code`.",
+                            "enum": [
+                              "running",
+                              "succeeded",
+                              "failed"
+                            ],
+                            "example": "succeeded",
+                            "type": "string"
+                          },
+                          "trigger": {
+                            "description": "How the run started. `scheduled` - started by the cron schedule. `manual` - started on demand, for example with the trigger cron job endpoint.",
+                            "enum": [
+                              "scheduled",
+                              "manual"
+                            ],
+                            "example": "scheduled",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "process_id",
+                          "job_name",
+                          "trigger",
+                          "status",
+                          "reason",
+                          "exit_code",
+                          "retries",
+                          "scheduled_at",
+                          "started_at",
+                          "finished_at"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "limit": {
+                      "description": "Current pagination limit",
+                      "example": 25,
+                      "maximum": 100,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "description": "Current pagination offset",
+                      "example": 0,
+                      "maximum": 10000,
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "total": {
+                      "description": "Total number of items matching the query",
+                      "example": 42,
+                      "maximum": 10000,
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "total",
+                    "offset",
+                    "limit"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Unauthorized",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 401,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "This API key is missing the <RESOURCE>:<ACTION> permission. Grant it to the key or use a key that has it.",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 403,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Not found",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 404,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Too many requests",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 429,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "data": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "code": {
+                          "description": "Error tracking code for support reference",
+                          "example": "err-abc-123",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "Additional error details or instructions",
+                          "example": "If you need assistance, please contact support and provide this error code.",
+                          "type": "string"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "message": {
+                      "description": "Error message",
+                      "example": "Internal Server Error",
+                      "type": "string"
+                    },
+                    "status": {
+                      "description": "HTTP status code",
+                      "example": 500,
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "message",
+                    "status"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Default Response"
+          }
+        },
+        "summary": "List cron runs",
+        "tags": [
+          "Applications"
+        ],
+        "x-required-permissions": [
+          "APP:READ"
+        ]
+      }
+    },
     "/applications/{id}/processes/{process_id}/terminal": {
       "get": {
         "description": "Open an interactive terminal (shell) session to a running application process.\n\n**This is a WebSocket endpoint.** Connect using a WebSocket client with the `Upgrade: websocket` header. Standard HTTP requests return a `426 Upgrade Required` response.\n\n### Connection\n\n```\nwscat -c \"wss://api.sevalla.com/v3/applications/{id}/processes/{process_id}/terminal?shell=bash&cols=120&rows=40\" -H \"Authorization: Bearer <api_key>\"\n```\n\nAuthentication runs before the WebSocket upgrade - invalid credentials are rejected with a standard HTTP 401/403 response.\n\n### Communication\n\nOnce connected, the WebSocket streams stdin/stdout bidirectionally to a shell running inside the container. Send text messages as shell input and receive command output as text messages.\n\n### Terminal size\n\nThe terminal starts at the size given by the `cols` and `rows` query parameters, or 80x24 without them. To resize it, send a **binary** message holding the UTF-8 encoded JSON `{\"type\":\"resize\",\"cols\":120,\"rows\":40}`. Sizes are clamped to 2-500 columns and 2-200 rows, and a resize message without integer `cols` and `rows` is ignored. Resize messages never reach the shell. Text messages are always shell input, even when they look like a resize message, and any other binary message is passed to the shell as input as well.\n\n### Environment\n\nThe shell starts with `TERM=xterm-256color` and `COLORTERM=truecolor`. It also gets `LANG=C.UTF-8`, unless the container already sets `LANG` or an `LC_*` variable.\n\n### Output\n\nOutput arrives as UTF-8 text messages. A character that the container writes in two pieces is always sent whole, never as a replacement character.\n\n### Keepalive\n\nThe server sends a WebSocket ping every 25 seconds, which standard WebSocket clients answer with a pong on their own. This keeps an idle session open through proxies and load balancers. A connection that leaves two pings in a row unanswered is closed, and so is a session that has had no input and no output for 8 hours.\n\n### Disconnects\n\nA closed connection is not resumed, and the next connection starts a new shell. Run long jobs under `nohup`, or in `tmux` or `screen` when the image has them, so you can find them again after a disconnect.\n\n### Close codes\n\n- `4000` - Application or process not found\n- `4001` - No running pod available to connect to\n- `4002` - Shell stream error\n- `4003` - Shell stream closed normally\n- `4004` - No input and no output for 8 hours\n- `4005` - Failed to connect to the pod\n- `4300` - Unexpected server error",
@@ -33022,7 +34408,7 @@
     },
     "/applications/{id}/processes/{process_id}/trigger": {
       "post": {
-        "description": "Manually trigger an immediate execution of a cron process. This creates a one-off run outside of the regular cron schedule. The process must be of type `cron`.",
+        "description": "Manually trigger an immediate execution of a cron process. This creates a one-off run outside of the regular cron schedule. The process must be of type `cron`. The run uses the same job template as scheduled runs. Returns 403 if the application or its company is suspended.",
         "operationId": "triggerProcessCronV3",
         "parameters": [
           {
@@ -35599,7 +36985,7 @@
     },
     "/applications/{id}/suspend": {
       "post": {
-        "description": "Suspend a running application by stopping all of its processes. The application configuration, environment variables, and deployment history are preserved. Use the activate endpoint to restore the application.",
+        "description": "Suspend an application by stopping all of its processes. The request returns right away and the suspension runs in the background: deployments in progress are cancelled, web and worker processes are scaled to zero, cron schedules are paused, and cron or job runs that are still executing are stopped (they get SIGTERM and are force-stopped 30 seconds later). New deployments and manual cron runs are refused from the moment the suspension is requested. Poll the get application endpoint until `suspension_status` is `suspended`, which means every process was verified stopped. Each process reports when it stopped in `stopped_at`. If `suspension_status` turns `suspensionFailed`, call this endpoint again. The application configuration, environment variables and deployment history are kept. Use the activate endpoint to start the application again.",
         "operationId": "suspendApplicationV3",
         "parameters": [
           {
@@ -64367,12 +65753,13 @@
                         "type": "string"
                       },
                       "build_type": {
-                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. Defaults to `nixpacks`.",
+                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code. Defaults to `ingot`.",
                         "enum": [
                           "dockerfile",
                           "pack",
                           "nixpacks",
-                          "railpack"
+                          "railpack",
+                          "ingot"
                         ],
                         "example": "dockerfile",
                         "type": "string"
@@ -66186,12 +67573,13 @@
                         "type": "string"
                       },
                       "build_type": {
-                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. Defaults to `nixpacks`.",
+                        "description": "Build strategy for preview apps. `nixpacks` - auto-detected build system. `railpack` - auto-detected build system, successor to Nixpacks. `dockerfile` - build using a Dockerfile. `pack` - build using Cloud Native Buildpacks. `ingot` - build using a Dockerfile that Ingot generates from the source code. Defaults to `ingot`.",
                         "enum": [
                           "dockerfile",
                           "pack",
                           "nixpacks",
-                          "railpack"
+                          "railpack",
+                          "ingot"
                         ],
                         "example": "dockerfile",
                         "type": "string"

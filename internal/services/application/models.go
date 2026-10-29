@@ -45,6 +45,7 @@ type ApplicationResourceModel struct {
 	Type                       types.String `tfsdk:"type"`
 	Status                     types.String `tfsdk:"status"`
 	IsSuspended                types.Bool   `tfsdk:"is_suspended"`
+	SuspensionStatus           types.String `tfsdk:"suspension_status"`
 	CreatedBy                  types.String `tfsdk:"created_by"`
 	CreatedAt                  types.String `tfsdk:"created_at"`
 	UpdatedAt                  types.String `tfsdk:"updated_at"`
@@ -52,15 +53,16 @@ type ApplicationResourceModel struct {
 
 // ApplicationListItemModel is the Terraform state model for items in the sevalla_applications data source.
 type ApplicationListItemModel struct {
-	ID          types.String `tfsdk:"id"`
-	Name        types.String `tfsdk:"name"`
-	DisplayName types.String `tfsdk:"display_name"`
-	Status      types.String `tfsdk:"status"`
-	Type        types.String `tfsdk:"type"`
-	Source      types.String `tfsdk:"source"`
-	IsSuspended types.Bool   `tfsdk:"is_suspended"`
-	CreatedAt   types.String `tfsdk:"created_at"`
-	UpdatedAt   types.String `tfsdk:"updated_at"`
+	ID               types.String `tfsdk:"id"`
+	Name             types.String `tfsdk:"name"`
+	DisplayName      types.String `tfsdk:"display_name"`
+	Status           types.String `tfsdk:"status"`
+	Type             types.String `tfsdk:"type"`
+	Source           types.String `tfsdk:"source"`
+	IsSuspended      types.Bool   `tfsdk:"is_suspended"`
+	SuspensionStatus types.String `tfsdk:"suspension_status"`
+	CreatedAt        types.String `tfsdk:"created_at"`
+	UpdatedAt        types.String `tfsdk:"updated_at"`
 }
 
 // ApplicationListDataSourceModel is the top-level model for the sevalla_applications data source.
@@ -93,6 +95,7 @@ func flattenApplication(ctx context.Context, app *client.Application, model *App
 		model.WaitForChecks = types.BoolValue(false)
 	}
 	model.IsSuspended = types.BoolValue(app.IsSuspended)
+	model.SuspensionStatus = types.StringValue(app.SuspensionStatus)
 	model.BuildType = types.StringValue(app.BuildType)
 	model.CreatedAt = types.StringValue(app.CreatedAt)
 	model.UpdatedAt = types.StringValue(app.UpdatedAt)

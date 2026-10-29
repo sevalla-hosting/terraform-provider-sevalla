@@ -63,6 +63,7 @@ output "app_name" {
 - `repo_url` (String) The repository URL for the application source.
 - `source` (String) The source type of the application.
 - `status` (String) The current status of the application.
+- `suspension_status` (String) Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.
 - `type` (String) The application type.
 - `updated_at` (String) When the application was last updated.
 - `wait_for_checks` (Boolean, Deprecated) Always null.

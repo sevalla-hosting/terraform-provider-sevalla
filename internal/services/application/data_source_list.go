@@ -64,6 +64,10 @@ func (d *applicationListDataSource) Schema(_ context.Context, _ datasource.Schem
 							Description: "Whether the application is suspended.",
 							Computed:    true,
 						},
+						"suspension_status": schema.StringAttribute{
+							Description: "Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.",
+							Computed:    true,
+						},
 						"created_at": schema.StringAttribute{
 							Description: "When the application was created.",
 							Computed:    true,
@@ -111,15 +115,16 @@ func (d *applicationListDataSource) Read(ctx context.Context, _ datasource.ReadR
 
 	for i, app := range apps {
 		model.Applications[i] = ApplicationListItemModel{
-			ID:          types.StringValue(app.ID),
-			Name:        types.StringValue(app.Name),
-			DisplayName: types.StringValue(app.DisplayName),
-			Status:      optionalString(app.Status),
-			Type:        types.StringValue(app.Type),
-			Source:      types.StringValue(app.Source),
-			IsSuspended: types.BoolValue(app.IsSuspended),
-			CreatedAt:   types.StringValue(app.CreatedAt),
-			UpdatedAt:   types.StringValue(app.UpdatedAt),
+			ID:               types.StringValue(app.ID),
+			Name:             types.StringValue(app.Name),
+			DisplayName:      types.StringValue(app.DisplayName),
+			Status:           optionalString(app.Status),
+			Type:             types.StringValue(app.Type),
+			Source:           types.StringValue(app.Source),
+			IsSuspended:      types.BoolValue(app.IsSuspended),
+			SuspensionStatus: types.StringValue(app.SuspensionStatus),
+			CreatedAt:        types.StringValue(app.CreatedAt),
+			UpdatedAt:        types.StringValue(app.UpdatedAt),
 		}
 	}
 
