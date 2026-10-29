@@ -37,10 +37,10 @@ func fakeApplicationAPI(t *testing.T) http.HandlerFunc {
 				"id": "app-1", "company_id": "c-1", "project_id": nil, "name": "web-1", "namespace": "web-1",
 				"display_name": in["display_name"], "source": in["source"], "type": "app", "status": nil,
 				"build_cache_enabled": true, "git_lfs_enabled": true, "hibernation_enabled": false,
-				"hibernate_after_seconds": nil, "auto_deploy": false, "is_suspended": false,
+				"hibernate_after_seconds": nil, "auto_deploy": false, "is_suspended": false, "suspension_status": "active",
 				"is_cdn_enabled": false, "is_edge_cache_enabled": false, "git_type": nil,
 				"repo_url": in["repo_url"], "default_branch": "main", "docker_image": nil,
-				"build_type": "nixpacks", "build_path": nil, "pack_builder": nil, "nixpacks_version": nil,
+				"build_type": "ingot", "build_path": nil, "pack_builder": nil, "nixpacks_version": nil,
 				"dockerfile_path": nil, "docker_context": nil, "allow_deploy_paths": []any{}, "ignore_deploy_paths": []any{},
 				"buildpacks": []any{}, "cluster_id": in["cluster_id"], "docker_registry_credential_id": nil,
 				"created_by": nil, "created_at": "2025-01-01T00:00:00.000Z", "updated_at": "2025-01-01T00:00:00.000Z",
@@ -91,6 +91,15 @@ resource "sevalla_application" "web" {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: testutil.TestAccProtoV6ProviderFactories,
 		Steps: []resource.TestStep{
+			{
+				// Without build_type the API picks its default builder.
+				Config: config(""),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("sevalla_application.web", "build_type", "ingot"),
+					resource.TestCheckResourceAttr("sevalla_application.web", "suspension_status", "active"),
+					resource.TestCheckNoResourceAttr("sevalla_application.web", "dockerfile_path"),
+				),
+			},
 			{
 				Config: config(`
   build_type   = "pack"

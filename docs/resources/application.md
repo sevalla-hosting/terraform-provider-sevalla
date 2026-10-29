@@ -30,7 +30,7 @@ resource "sevalla_application" "private" {
   repo_url       = "https://github.com/myorg/private-repo"
   default_branch = "main"
   auto_deploy    = true
-  build_type     = "nixpacks"
+  build_type     = "ingot"
 }
 
 # Deploy from a Docker image
@@ -57,7 +57,7 @@ resource "sevalla_application" "docker" {
 - `auto_deploy` (Boolean) Whether to automatically deploy on push.
 - `build_cache_enabled` (Boolean) Whether the build cache is enabled.
 - `build_path` (String) The build path within the repository.
-- `build_type` (String) The build type. Valid values: `dockerfile`, `pack` (Cloud Native Buildpacks), `nixpacks`, `railpack`. Defaults to `dockerfile`.
+- `build_type` (String) The build type. Valid values: `ingot` (a Dockerfile generated from the source), `dockerfile`, `pack` (Cloud Native Buildpacks), `railpack`, `nixpacks` (deprecated). New Git applications default to `ingot`.
 - `buildpacks` (Attributes List) Custom buildpacks when `build_type` is `pack`. Null for other build types. (see [below for nested schema](#nestedatt--buildpacks))
 - `cdn_enabled` (Boolean) Whether the CDN is enabled for the application.
 - `default_branch` (String) The default branch to deploy from. Defaults to the repository's default branch.
@@ -71,7 +71,7 @@ resource "sevalla_application" "docker" {
 - `hibernate_after_seconds` (Number) Number of seconds of inactivity before the application hibernates (1-604800).
 - `hibernation_enabled` (Boolean) Whether hibernation is enabled for the application.
 - `ignore_deploy_paths` (List of String) Glob patterns of paths that never trigger an automatic deployment. Cannot be combined with a non-empty `allow_deploy_paths`. Set to `[]` to clear.
-- `nixpacks_version` (String) The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to the platform version.
+- `nixpacks_version` (String) The Nixpacks version to pin when `build_type` is `nixpacks`. Valid values: `1.29`, `1.39`, `1.41`. Defaults to `1.41`. Nixpacks is deprecated.
 - `pack_builder` (String) The Cloud Native Buildpacks builder image when `build_type` is `pack`. Valid values: `heroku/builder:22`, `heroku/builder:24`.
 - `project_id` (String) The ID of the project to group the application under. Changing it moves the application to the new project; removing it from the configuration leaves the application in its current project.
 - `repo_url` (String) The repository URL for the application source.
@@ -87,6 +87,7 @@ resource "sevalla_application" "docker" {
 - `name` (String) The system-generated name of the application.
 - `namespace` (String) The Kubernetes namespace of the application.
 - `status` (String) The current status of the application.
+- `suspension_status` (String) Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.
 - `type` (String) The application type (app or previewApp).
 - `updated_at` (String) The timestamp when the application was last updated.
 

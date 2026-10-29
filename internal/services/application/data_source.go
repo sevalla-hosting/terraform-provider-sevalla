@@ -178,6 +178,10 @@ func (d *applicationDataSource) Schema(_ context.Context, _ datasource.SchemaReq
 				Description: "Whether the application is suspended.",
 				Computed:    true,
 			},
+			"suspension_status": schema.StringAttribute{
+				Description: "Where the application is in the suspend and activate flow: `active`, `suspending`, `suspended`, `suspensionFailed`, `activating` or `activationFailed`.",
+				Computed:    true,
+			},
 			"created_by": schema.StringAttribute{
 				Description: "The user who created the application.",
 				Computed:    true,
